@@ -1,0 +1,15 @@
+logging:
+  level: INFO
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+  
+processing:
+  max_workers: 4
+  timeout: 30
+  
+directories:
+  sbom_dir: "./input/sboms"
+  report_dir: "./output/reports"
+  
+export:
+  formats: ["json", "csv", "excel"]
+  include_timestamp: true
