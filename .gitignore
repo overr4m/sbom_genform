@@ -50,6 +50,7 @@ output/
 # sbom/git/*
 # sbom/images/*
 secgensbom_out/
+secgensbom_reports/
 .dependency-check-data/
 
 # Databases

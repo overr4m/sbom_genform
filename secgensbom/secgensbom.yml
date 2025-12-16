@@ -1,0 +1,31 @@
+# GitLab CI include for running SecGenSBOM pipeline
+# This job runs pipeline.sh inside the repo and collects artifacts:
+# - secgensbom_out/*.json (cyclonedx SBOM)
+# - secgensbom_out/dep-check/*, secgensbom_out/trivy/*, secgensbom_out/clair/* (raw scanner reports)
+# - secgensbom_reports/* (xlsx/odt reports)
+
+stages:
+  - secgensbom
+
+secgensbom_pipeline:
+  stage: secgensbom
+  image: docker:stable
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    # make sure python3 and node are available — use a custom image if needed
+  script:
+    - apk add --no-cache python3 py3-pip nodejs npm
+    - chmod +x secgensbom/pipeline.sh
+    # pass CI_PROJECT_DIR so outputs are written into the importing project workspace
+    - ./secgensbom/pipeline.sh "$CI_PROJECT_DIR"
+  artifacts:
+    when: always
+    paths:
+      - secgensbom_out/*.json
+      - secgensbom_out/dep-check/*
+      - secgensbom_out/trivy/*
+      - secgensbom_out/clair/*
+      - secgensbom_reports/*
+    expire_in: 1 week
