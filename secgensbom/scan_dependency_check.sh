@@ -8,6 +8,7 @@ mkdir -p "${DEP_REPORT_DIR}"
 # mkdir -p "${DEP_CHECK_DATA}" "${DEP_REPORT_DIR}"
 
 HOST_PROJECT_DIR="${HOST_PROJECT_DIR:-${PROJECT_DIR}}"
+# allow HOST_DEP_REPORT_DIR to be set externally, otherwise use OUTPUT_DIR/dependency-check
 HOST_DEP_REPORT_DIR="${HOST_DEP_REPORT_DIR:-${DEP_REPORT_DIR}}"
 
 # DEP_CHECK_DATA="${DEP_CHECK_DATA:-$HOME/.dependency-check}"

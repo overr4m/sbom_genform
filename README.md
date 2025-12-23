@@ -398,8 +398,86 @@ find . -name ".DS_Store" -delete
 ### Интеграция с CI/CD
 
 ```yaml
-
+# Пример include для GitLab CI — файл secgensbom/secgensbom.yml
+## stages: build -> secgensbom
 ```
+
+## CI: сборка и использование SCA образа (локальный Docker registry)
+
+Добавлена поддержка автоматической сборки и публикации SCA-образа, используемого в `secgensbom` pipeline.
+
+- Сборка: stage `build`, job `build_sca_image` собирает образ из `resolve/SCA.Dockerfile`.
+- Публикация: при наличии переменных CI образ будет запушен в указанный реестр.
+- Использование: основной job `secgensbom_pipeline` запускается с `image` указывающим на собранный образ.
+
+Переменные CI (добавьте в GitLab -> Settings -> CI/CD -> Variables):
+
+- `DOCKER_REGISTRY` — адрес вашего Docker registry (например `registry.example.com:5000`).
+- `DOCKER_USER` — имя пользователя для реестра.
+- `DOCKER_PASSWORD` — пароль или токен для реестра.
+
+Как это работает
+
+- Job `build_sca_image`:
+  - Строит локально образ `secgensbom-sca:${CI_COMMIT_SHORT_SHA}`.
+  - Если заданы `DOCKER_REGISTRY` и `DOCKER_USER`, тегирует образ как `<DOCKER_REGISTRY>/secgensbom/secgensbom-sca:<sha>` и пушит.
+  - Если реестр не настроен — сохраняет `secgensbom-sca.tar` как артефакт.
+- Job `secgensbom_pipeline`:
+  - Использует в качестве `image` образ `<DOCKER_REGISTRY>/secgensbom/secgensbom-sca:<sha>` (переменная `DOCKER_REGISTRY` должна быть задана в CI).
+  - При логине в реестр используется `DOCKER_USER`/`DOCKER_PASSWORD`.
+
+Примеры использования
+
+1) Настройка GitLab CI (пример переменных):
+
+  - DOCKER_REGISTRY=registry.mycompany.local:5000
+  - DOCKER_USER=ci-bot
+  - DOCKER_PASSWORD=<masked-token>
+
+2) Тест локально (с Nexus/Harbor/другим registry):
+
+```bash
+export DOCKER_REGISTRY=registry.example.com:5000
+export DOCKER_USER=myuser
+export DOCKER_PASSWORD=mypassword
+
+# Сборка локально
+docker build -t secgensbom-sca:local -f resolve/SCA.Dockerfile .
+
+# Тегирование и пуш в реестр
+docker tag secgensbom-sca:local $DOCKER_REGISTRY/secgensbom/secgensbom-sca:local
+echo $DOCKER_PASSWORD | docker login -u $DOCKER_USER --password-stdin $DOCKER_REGISTRY
+docker push $DOCKER_REGISTRY/secgensbom/secgensbom-sca:local
+
+# Теперь в CI вы сможете использовать image: "$DOCKER_REGISTRY/secgensbom/secgensbom-sca:local"
+```
+
+3) Если реестр не доступен
+
+- Pipeline по-прежнему может работать: `build_sca_image` сохранит `secgensbom-sca.tar` как артефакт, который можно скачать и загрузить локально через `docker load -i secgensbom-sca.tar`.
+
+Советы
+
+- Убедитесь, что в реестре есть репозиторий `secgensbom` с типом Docker hosted.
+- Используйте маскированные CI-переменные (`masked`) для `DOCKER_PASSWORD`.
+- При использовании приватного реестра с самоподписанными сертификатами настройте доверие к сертификатам на раннерах GitLab.
+
+## GitHub Actions
+
+Добавлен workflow `.github/workflows/secgensbom.yml`, который выполняет те же шаги, что и GitLab CI:
+
+- Сборка SCA-образа из `resolve/SCA.Dockerfile`.
+- Публикация в реестр, если заданы секреты.
+- Запуск `secgensbom/pipeline.sh` после сборки.
+
+Для работы в GitHub Actions добавьте секреты репозитория (`Settings -> Secrets -> Actions`):
+
+- `DOCKER_USER` — пользователь для реестра.
+- `DOCKER_PASSWORD` — пароль/токен для реестра.
+
+Опционально задайте переменную окружения `DOCKER_REGISTRY` (в workflow через `env` или как repository secret) с адресом реестра (пример: `registry.example.com:5000`).
+
+Workflow можно запускать вручную через `Actions -> SecGenSBOM -> Run workflow`.
 
 ***
 
