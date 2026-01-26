@@ -53,6 +53,7 @@ except ImportError:
     logging.warning("python-dotenv не установлен. Переменные окружения из .env файлов не будут загружены.")
 
 
+<<<<<<< HEAD
 class SbomFormatterError(Exception):
     """Базовое исключение для ошибок форматирования SBOM."""
     pass
@@ -243,6 +244,9 @@ def process_sboms(sbom_dir: str, report_dir: str) -> None:
     config = FormatterConfig(sbom_dir, report_dir)
     formatter = SbomFormatter(config)
     formatter.process_all_sboms()
+=======
+def process_sboms(sbom_dir, report_dir):
+>>>>>>> 9689fad (testfly)
     handler = SbomHandler(sbom_dir)
     for sbom_path in handler.sbomsList:
         sbom_content = handler.readJson(sbom_path)
@@ -263,6 +267,7 @@ def process_sboms(sbom_dir: str, report_dir: str) -> None:
         exporter.exportToExcel(excel_name)
         exporter.exportToOdt(odt_name)
 
+<<<<<<< HEAD
 def parse_arguments() -> argparse.Namespace:
     """
     Парсинг аргументов командной строки.
@@ -352,6 +357,8 @@ def main() -> int:
         logging.exception(f"Неожиданная ошибка: {e}")
         return 1
 
+=======
+>>>>>>> 9689fad (testfly)
 
 if __name__ == "__main__":
     sys.exit(main())

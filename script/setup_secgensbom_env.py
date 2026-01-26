@@ -1,5 +1,6 @@
 from pathlib import Path
 
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     project_inject = repo_root / "project_inject"
@@ -16,6 +17,7 @@ def main() -> None:
     print(f"HOST_DEP_REPORT_DIR={depcheck_dir.resolve()}")
     print(f"HOST_TRIVY_REPORT_DIR={trivy_dir.resolve()}")
     print(f"DEP_CHECK_DATA={depcheck_data.resolve()}")
+
 
 if __name__ == "__main__":
     main()

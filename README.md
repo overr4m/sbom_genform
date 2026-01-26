@@ -206,9 +206,14 @@ $ git submodule update
 $ python3 -m venv venv 
 $ source venv/bin/activate
 $ python -m pip install --upgrade pip
+<<<<<<< HEAD
 $ pip install -r requirements.txt
 $ python formatter.py
 $ deactivate
+=======
+$ cd scripts && pip install -r requirements.txt
+$ python formatter.py
+>>>>>>> 9689fad (testfly)
 ```
 * Сборка Docker для formatter
 
@@ -398,6 +403,7 @@ find . -name ".DS_Store" -delete
 ### Интеграция с CI/CD
 
 ```yaml
+<<<<<<< HEAD
 # Пример include для GitLab CI — файл secgensbom/secgensbom.yml
 ## stages: build -> secgensbom
 ```
@@ -479,6 +485,11 @@ docker push $DOCKER_REGISTRY/secgensbom/secgensbom-sca:local
 
 Workflow можно запускать вручную через `Actions -> SecGenSBOM -> Run workflow`.
 
+=======
+
+```
+
+>>>>>>> 9689fad (testfly)
 ***
 
 

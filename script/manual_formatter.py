@@ -19,7 +19,12 @@ load_dotenv()
 
 DepsMemory = []
 
+<<<<<<< HEAD
 def process_sboms(sbom_dir, report_dir, src_langs=None, signer_opts=None):
+=======
+
+def process_sboms(sbom_dir, report_dir):
+>>>>>>> 9689fad (testfly)
     handler = SbomHandler(sbom_dir)
     for sbom_path in handler.sbomsList:
         sbom_content = handler.readJson(sbom_path)
@@ -59,6 +64,7 @@ def process_sboms(sbom_dir, report_dir, src_langs=None, signer_opts=None):
         exporter.exportToExcel(excel_name)
         exporter.exportToOdt(odt_name)
 
+<<<<<<< HEAD
 def detect_langs_from_deps(deps_file: str) -> list:
     """Infer source language(s) from dependency file name.
     This is a lightweight heuristic and does not parse the file deeply.
@@ -79,6 +85,8 @@ def detect_langs_from_deps(deps_file: str) -> list:
     # default unknown
     return []
 
+=======
+>>>>>>> 9689fad (testfly)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Генерация отчётов *.xlsx и *.odt по SBOM с подписью")
@@ -94,6 +102,7 @@ if __name__ == "__main__":
 
     base_dir = Path(__file__).resolve().parent
 
+<<<<<<< HEAD
     # optional environment setup for SecGenSBOM
     if args.setup_env:
         logging.info("Настройка служебных директорий SecGenSBOM...")
@@ -106,9 +115,16 @@ if __name__ == "__main__":
     odt_dir = out_root / ODT_DIR
     excel_dir.mkdir(parents=True, exist_ok=True)
     odt_dir.mkdir(parents=True, exist_ok=True)
+=======
+    # demo git SBOM -> reports/git
+    process_sboms(
+        str(base_dir.parent / "sbom" / "git"), str(base_dir.parent / "reports" / "git")
+    )
+>>>>>>> 9689fad (testfly)
 
     src_langs = detect_langs_from_deps(args.deps) if args.deps else []
 
+<<<<<<< HEAD
     signer_opts = None
     if args.sign:
         signer_opts = {
@@ -116,6 +132,13 @@ if __name__ == "__main__":
             'public_key_path': args.public_key,
             'key_passphrase': args.passphrase,
         }
+=======
+    # demo images SBOM -> reports/images
+    process_sboms(
+        str(base_dir.parent / "sbom" / "images"),
+        str(base_dir.parent / "reports" / "images"),
+    )
+>>>>>>> 9689fad (testfly)
 
     if args.bom:
         # If a single file is provided, process it; if a directory, process all
