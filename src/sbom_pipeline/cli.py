@@ -20,12 +20,36 @@ from .pipeline import run as pipeline_run, format_sboms
 from .sign import verify_sbom
 from .utils import setup_logging
 
+from . import __version__
+
 app = typer.Typer(
-    name="sbom-pipeline",
-    help="SBOM Generator & Formatter — pure Python, no shell.",
+    name="sbom",
+    help="SBOM Generator & Formatter — pure Python, no shell scripts.",
     add_completion=False,
+    rich_markup_mode="rich",
 )
 console = Console()
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        console.print(f"sbom-pipeline [cyan]{__version__}[/cyan]")
+        raise typer.Exit()
+
+
+@app.callback(invoke_without_command=True)
+def _main(
+    ctx: typer.Context,
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version", "-V",
+        help="Показать версию и выйти.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
 
 
 # ------------------------------------------------------------------
