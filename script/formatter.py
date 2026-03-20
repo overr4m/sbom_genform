@@ -53,7 +53,6 @@ except ImportError:
     logging.warning("python-dotenv не установлен. Переменные окружения из .env файлов не будут загружены.")
 
 
-<<<<<<< HEAD
 class SbomFormatterError(Exception):
     """Базовое исключение для ошибок форматирования SBOM."""
     pass
@@ -67,9 +66,9 @@ class SbomProcessingError(SbomFormatterError):
 class FormatterConfig:
     """
     Конфигурация для форматировщика SBOM файлов.
-    
+
     Управляет путями к директориям и настройками для обработки SBOM файлов.
-    
+
     Attributes:
         base_dir (Path): Базовая директория скрипта
         sbom_dir (Path): Директория с SBOM файлами
@@ -77,11 +76,11 @@ class FormatterConfig:
         excel_dir (Path): Поддиректория для Excel файлов
         odt_dir (Path): Поддиректория для ODT файлов
     """
-    
+
     def __init__(self, sbom_dir: Optional[str] = None, report_dir: Optional[str] = None):
         """
         Инициализирует конфигурацию с указанными или значениями по умолчанию.
-        
+
         Args:
             sbom_dir: Путь к директории с SBOM файлами (опционально)
             report_dir: Путь к директории для отчетов (опционально)
@@ -91,11 +90,11 @@ class FormatterConfig:
         self.report_dir = Path(report_dir) if report_dir else self.base_dir.parent / REPORTS_DIR
         self.excel_dir = self.report_dir / EXCEL_DIR
         self.odt_dir = self.report_dir / ODT_DIR
-    
+
     def ensure_directories_exist(self) -> None:
         """
         Создает необходимые директории, если они не существуют.
-        
+
         Raises:
             SbomFormatterError: Если возникла ошибка при создании директорий
         """
@@ -110,67 +109,67 @@ class FormatterConfig:
 class SbomFormatter:
     """
     Форматировщик SBOM файлов для экспорта в различные форматы.
-    
+
     Основной класс для обработки SBOM файлов, извлечения зависимостей
     и создания отчетов в форматах Excel и ODT.
-    
+
     Attributes:
         config (FormatterConfig): Конфигурация форматировщика
         handler (SbomHandler): Обработчик SBOM файлов
     """
-    
+
     def __init__(self, config: FormatterConfig):
         """
         Инициализирует форматировщик с указанной конфигурацией.
-        
+
         Args:
             config: Конфигурация для форматировщика
         """
         self.config = config
         self.handler = SbomHandler(str(config.sbom_dir))
-    
+
     def _extract_dependencies(self, sbom_content: Dict[str, Any], sbom_path: str) -> List[Dependency]:
         """
         Извлекает зависимости из содержимого SBOM файла.
-        
+
         Args:
             sbom_content: Содержимое SBOM файла в виде словаря
             sbom_path: Путь к исходному SBOM файлу
-            
+
         Returns:
             Список объектов Dependency
         """
         components = sbom_content.get("components", [])
         dependencies = []
-        
+
         for component in components:
             if component.get("type") == COMPONENT_TYPE_LIBRARY:
                 try:
                     dependency = Dependency(
                         name=component["name"],
                         version=component["version"],
-                        srcLangs=[],
-                        purl=component.get("purl"),
-                        source=sbom_path
+                        depType=[],
+                        purl=component.get("purl") or "",
+                        pathToSbom=sbom_path,
                     )
                     dependencies.append(dependency)
                 except KeyError as e:
                     logging.warning(f"Пропущен компонент с отсутствующим полем {e} в {sbom_path}")
                 except Exception as e:
                     logging.error(f"Ошибка при создании зависимости из {sbom_path}: {e}")
-        
+
         return dependencies
-    
+
     def _process_single_sbom(self, sbom_path: str) -> None:
         """
         Обрабатывает один SBOM файл.
-        
+
         Читает SBOM файл, извлекает зависимости и создает отчеты
         в форматах Excel и ODT.
-        
+
         Args:
             sbom_path: Путь к SBOM файлу для обработки
-            
+
         Raises:
             SbomProcessingError: Если произошла ошибка при обработке файла
         """
@@ -179,41 +178,41 @@ class SbomFormatter:
             if sbom_content is None:
                 logging.warning(f"Пропущен файл с пустым содержимым: {sbom_path}")
                 return
-            
+
             base_name = Path(sbom_path).stem
             excel_path = self.config.excel_dir / f"{base_name}{EXCEL_EXTENSION}"
             odt_path = self.config.odt_dir / f"{base_name}{ODT_EXTENSION}"
-            
+
             dependencies = self._extract_dependencies(sbom_content, sbom_path)
             if not dependencies:
                 logging.warning(f"Не найдено зависимостей в {sbom_path}")
                 return
-            
+
             exporter = Exporter(dependencies)
             exporter.exportToExcel(str(excel_path))
             exporter.exportToOdt(str(odt_path))
-            
+
             logging.info(f"Обработан файл: {sbom_path} -> {len(dependencies)} зависимостей")
-            
+
         except Exception as e:
             raise SbomProcessingError(f"Ошибка обработки файла {sbom_path}: {e}")
-    
+
     def process_all_sboms(self) -> None:
         """
         Обрабатывает все SBOM файлы в директории.
-        
+
         Находит все SBOM файлы в настроенной директории и обрабатывает их.
         Ведет статистику успешно обработанных файлов и ошибок.
         """
         if not self.handler.sbomsList:
             logging.warning(f"Не найдено SBOM файлов в директории: {self.config.sbom_dir}")
             return
-        
+
         self.config.ensure_directories_exist()
-        
+
         processed_count = 0
         error_count = 0
-        
+
         for sbom_path in self.handler.sbomsList:
             try:
                 self._process_single_sbom(sbom_path)
@@ -224,18 +223,18 @@ class SbomFormatter:
             except Exception as e:
                 logging.error(f"Неожиданная ошибка при обработке {sbom_path}: {e}")
                 error_count += 1
-        
+
         logging.info(f"Обработка завершена. Успешно: {processed_count}, с ошибками: {error_count}")
 
 
 def process_sboms(sbom_dir: str, report_dir: str) -> None:
     """
     Обработка SBOM файлов (устаревшая функция для обратной совместимости).
-    
+
     Args:
         sbom_dir: Путь к директории с SBOM файлами
         report_dir: Путь к директории для отчетов
-        
+
     Note:
         Эта функция устарела и оставлена для обратной совместимости.
         Рекомендуется использовать класс SbomFormatter.
@@ -244,34 +243,12 @@ def process_sboms(sbom_dir: str, report_dir: str) -> None:
     config = FormatterConfig(sbom_dir, report_dir)
     formatter = SbomFormatter(config)
     formatter.process_all_sboms()
-=======
-def process_sboms(sbom_dir, report_dir):
->>>>>>> 9689fad (testfly)
-    handler = SbomHandler(sbom_dir)
-    for sbom_path in handler.sbomsList:
-        sbom_content = handler.readJson(sbom_path)
-        if sbom_content is None:
-            continue
 
-        base = os.path.basename(sbom_path).replace(".json", "")
-        excel_name = f"{report_dir}/excel/{base}.xlsx"
-        odt_name = f"{report_dir}/odt/{base}.odt"
 
-        all_dependencies = [
-            Dependency(c["name"], c["version"], [], c.get("purl"), sbom_path)
-            for c in sbom_content.get("components", [])
-            if c.get("type") == "library"
-        ]
-
-        exporter = Exporter(all_dependencies)
-        exporter.exportToExcel(excel_name)
-        exporter.exportToOdt(odt_name)
-
-<<<<<<< HEAD
 def parse_arguments() -> argparse.Namespace:
     """
     Парсинг аргументов командной строки.
-    
+
     Returns:
         Объект с разобранными аргументами командной строки
     """
@@ -285,38 +262,38 @@ def parse_arguments() -> argparse.Namespace:
   %(prog)s --verbose
         """
     )
-    
+
     parser.add_argument(
         "--sbom-dir",
         type=str,
         help=f"Путь к директории с SBOM файлами (по умолчанию: ../{SBOM_OUT_DIR})"
     )
-    
+
     parser.add_argument(
         "--report-dir",
         type=str,
         help=f"Путь к директории для отчетов (по умолчанию: ../{REPORTS_DIR})"
     )
-    
+
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Подробный вывод логирования"
     )
-    
+
     parser.add_argument(
         "--version",
         action="version",
         version="%(prog)s 1.0.0"
     )
-    
+
     return parser.parse_args()
 
 
 def setup_logging(verbose: bool = False) -> None:
     """
     Настройка логирования.
-    
+
     Args:
         verbose: Включить подробное логирование (DEBUG уровень)
     """
@@ -327,26 +304,26 @@ def setup_logging(verbose: bool = False) -> None:
 def main() -> int:
     """
     Основная функция программы.
-    
+
     Инициализирует конфигурацию, парсит аргументы командной строки
     и запускает обработку SBOM файлов.
-    
+
     Returns:
         Код возврата: 0 при успехе, не 0 при ошибке
     """
     try:
         args = parse_arguments()
         setup_logging(args.verbose)
-        
+
         logging.info("Старт обработки SBOM файлов")
-        
+
         config = FormatterConfig(args.sbom_dir, args.report_dir)
         formatter = SbomFormatter(config)
         formatter.process_all_sboms()
-        
+
         logging.info("Обработка SBOM файлов завершена успешно")
         return 0
-        
+
     except SbomFormatterError as e:
         logging.error(f"Ошибка форматирования: {e}")
         return 1
@@ -357,8 +334,6 @@ def main() -> int:
         logging.exception(f"Неожиданная ошибка: {e}")
         return 1
 
-=======
->>>>>>> 9689fad (testfly)
 
 if __name__ == "__main__":
     sys.exit(main())

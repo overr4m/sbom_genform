@@ -1,61 +1,9 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Type, Optional
+import os
 import logging
-<<<<<<< HEAD
-from utils import clean_git_url
-
-class PackageProcessor(ABC):
-    """Abstract base class for package processors."""
-    
-    @abstractmethod
-    def process(self, purl_processed: Dict[str, str]) -> Dict[str, str]:
-        """Process package-specific information."""
-        pass
-
-class DebPackageProcessor(PackageProcessor):
-    def process(self, purl_processed: Dict[str, str]) -> Dict[str, str]:
-        # Implementation for Debian packages
-        pass
-
-class MvnPackageProcessor(PackageProcessor):
-    def process(self, purl_processed: Dict[str, str]) -> Dict[str, str]:
-        # Implementation for Maven packages
-        pass
-
-class NugetPackageProcessor(PackageProcessor):
-    def process(self, purl_processed: Dict[str, str]) -> Dict[str, str]:
-        # Implementation for NuGet packages
-        pass
-
-class NpmPackageProcessor(PackageProcessor):
-    def process(self, purl_processed: Dict[str, str]) -> Dict[str, str]:
-        # Implementation for NPM packages
-        pass
-
-class PackageProcessorFactory:
-    """Factory for creating package processors."""
-    
-    _processors: Dict[str, Type[PackageProcessor]] = {
-        'deb': DebPackageProcessor,
-        'maven': MvnPackageProcessor,
-        'nuget': NugetPackageProcessor,
-        'npm': NpmPackageProcessor,
-    }
-    
-    @classmethod
-    def get_processor(cls, package_type: str) -> Optional[PackageProcessor]:
-        processor_class = cls._processors.get(package_type)
-        if processor_class:
-            return processor_class()
-        logging.warning(f"Unsupported package type: {package_type}")
-        return None
-
-class Dependency:
-    def __init__(self, name: str, version: str, dep_type: list, purl: str, path_to_sbom: str):
-=======
 import requests
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from packageurl import PackageURL
+from bs4 import BeautifulSoup
 
 DepsMemory = []  # для отслеживания обработанных зависимостей
 
@@ -64,70 +12,28 @@ class Dependency:
     def __init__(
         self, name: str, version: str, depType: list, purl: str, pathToSbom: str
     ):
->>>>>>> 9689fad (testfly)
         self.name = name
         self.version = version
-        self.dep_type = dep_type
+        self.srcLangs = []
+        self.source = None
+        logging.info(f"Форматирование зависимости: {self.name}, версия {self.version}")
+
+        self.depType = depType
         self.purl = purl
-        self.path_to_sbom = path_to_sbom
-        self.additional_info = {}
-    
-    def process_purl(self, purl: str) -> Dict[str, str]:
-        """Process package URL with appropriate processor."""
+        self.pathToSbom = pathToSbom
+        if self not in DepsMemory:
+            try:
+                self.processPurl(purl)
+            except Exception as e:
+                logging.exception(f"Ошибка при processPurl для {purl}: {e}")
+            DepsMemory.append(self)
+        else:
+            oldDep = DepsMemory[DepsMemory.index(self)]
+            self.srcLangs = oldDep.srcLangs
+            self.source = oldDep.source
+
+    def _processDebPkg(self, purlProcessed):
         try:
-<<<<<<< HEAD
-            # Parse purl to get package type
-            package_type = purl.split(':')[0] if ':' in purl else None
-            
-            if not package_type:
-                raise ValueError(f"Invalid PURL format: {purl}")
-            
-            processor = PackageProcessorFactory.get_processor(package_type)
-            if not processor:
-                raise ValueError(f"No processor found for package type: {package_type}")
-            
-            # Process purl components (basic implementation)
-            purl_processed = {
-                'type': package_type,
-                'name': self.name,
-                'version': self.version
-            }
-            
-            processed_info = processor.process(purl_processed)
-            self.additional_info.update(processed_info)
-            
-            return processed_info
-            
-        except Exception as e:
-            logging.error(f"Error processing PURL {purl}: {str(e)}")
-            raise
-    
-    def clean_git_url(self, url: str) -> str:
-        """Delegate to utility function."""
-        return clean_git_url(url)
-    
-    @staticmethod
-    def process_sboms(sbom_dir: str, report_dir: str) -> list:
-        """Process all SBOMs in directory."""
-        dependencies = []
-        try:
-            # Implementation for processing SBOM files
-            logging.info(f"Processing SBOMs from {sbom_dir}")
-            # ... SBOM processing logic ...
-            return dependencies
-        except Exception as e:
-            logging.error(f"Error processing SBOMs: {str(e)}")
-            raise
-    
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Dependency):
-            return NotImplemented
-        return (self.name == other.name and 
-                self.version == other.version)
-    
-    def __hash__(self) -> int:
-        return hash((self.name, self.version))
-=======
             logging.info(f"_processDebPkg: {purlProcessed.name}")
             trackerUrl = f"https://tracker.debian.org/pkg/{purlProcessed.name}"
             trackerResponse = requests.get(trackerUrl, timeout=10)
@@ -170,7 +76,7 @@ class Dependency:
             )
 
             if not sourceRepoLink or not sourceRepoLink.get("href"):
-                logging.info(f"Репозиторий не найден в NuGet -> NUGET check manually")
+                logging.info("Репозиторий не найден в NuGet -> NUGET check manually")
                 return ["NUGET check manually"], pkgSrcUrl
 
             pkgSrcUrl = sourceRepoLink["href"]
@@ -190,7 +96,7 @@ class Dependency:
                         logging.info(f"Определены языки: {langs}")
                         return langs, pkgSrcUrl
                 logging.warning(
-                    f"Не удалось получить языки из GitHub API -> NUGET check manually"
+                    "Не удалось получить языки из GitHub API -> NUGET check manually"
                 )
                 return ["NUGET check manually"], pkgSrcUrl
 
@@ -242,8 +148,8 @@ class Dependency:
                 logging.info(f"GitHub API ответ: {langsResponse.status_code}")
                 if langsResponse.status_code == 200:
                     langsJson = langsResponse.json()
-                    for l in langsJson.keys():
-                        langs.append(l)
+                    for lang in langsJson.keys():
+                        langs.append(lang)
                     if len(langs) == 0:
                         logging.info(
                             "GitHub API вернул пустой список языков -> JavaScript*"
@@ -348,40 +254,3 @@ class Dependency:
 
     def __hash__(self):
         return hash((self.name, self.version, self.purl))
-
-    def processSboms(sbom_dir, report_dir):
-        logging.info(f"processSboms: {sbom_dir} -> {report_dir}")
-        handler = SbomHandler(sbom_dir)
-        for sbomPath in handler.sbomsList:
-            try:
-                logging.info(f"Обработка SBOM: {sbomPath}")
-                sbomContent = handler.readJson(sbomPath)
-
-                if sbomContent is None:
-                    logging.warning(
-                        "SBOM не удалось прочитать или он некорректен -> пропуск"
-                    )
-                    continue
-
-                base = os.path.basename(sbomPath).replace(".json", "")
-                excelName = f"{report_dir}/excel/{base}.xlsx"
-                odtName = f"{report_dir}/odt/{base}.odt"
-
-                if os.path.exists(excelName) and os.path.exists(odtName):
-                    logging.info(f"Отчеты уже существуют ({base}) -> пропуск")
-                    continue
-
-                allDependencies = [
-                    Dependency(c["name"], c["version"], [], c["purl"], sbomPath)
-                    for c in sbomContent.get("components", [])
-                    if c.get("type") == "library"
-                ]
-
-                logging.info(f"Собрано внешних зависимостей: {len(allDependencies)}")
-
-                exporter = Exporter(allDependencies)
-                exporter.exportToExcel(excelName)
-                exporter.exportToOdt(odtName)
-            except Exception as e:
-                logging.exception(f"Ошибка при обработке файла {sbomPath}: {e}")
->>>>>>> 9689fad (testfly)

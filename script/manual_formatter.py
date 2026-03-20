@@ -19,12 +19,8 @@ load_dotenv()
 
 DepsMemory = []
 
-<<<<<<< HEAD
-def process_sboms(sbom_dir, report_dir, src_langs=None, signer_opts=None):
-=======
 
-def process_sboms(sbom_dir, report_dir):
->>>>>>> 9689fad (testfly)
+def process_sboms(sbom_dir, report_dir, src_langs=None, signer_opts=None):
     handler = SbomHandler(sbom_dir)
     for sbom_path in handler.sbomsList:
         sbom_content = handler.readJson(sbom_path)
@@ -42,15 +38,13 @@ def process_sboms(sbom_dir, report_dir):
             dep = Dependency(
                 name=c.get("name", ""),
                 version=c.get("version", ""),
-                dep_type=c.get("properties", []) if isinstance(c.get("properties"), list) else [],
-                purl=c.get("purl"),
-                path_to_sbom=sbom_path,
+                depType=c.get("properties", []) if isinstance(c.get("properties"), list) else [],
+                purl=c.get("purl") or "",
+                pathToSbom=sbom_path,
             )
-            # annotate languages if provided
+            # override detected languages if caller provides explicit list
             if src_langs:
-                setattr(dep, 'src_langs', src_langs)
-            # try to store source
-            setattr(dep, 'source', c.get('purl') or c.get('supplier') or '')
+                dep.srcLangs = src_langs
             all_dependencies.append(dep)
 
         exporter = Exporter(
@@ -64,7 +58,7 @@ def process_sboms(sbom_dir, report_dir):
         exporter.exportToExcel(excel_name)
         exporter.exportToOdt(odt_name)
 
-<<<<<<< HEAD
+
 def detect_langs_from_deps(deps_file: str) -> list:
     """Infer source language(s) from dependency file name.
     This is a lightweight heuristic and does not parse the file deeply.
@@ -72,7 +66,7 @@ def detect_langs_from_deps(deps_file: str) -> list:
     base = os.path.basename(deps_file).lower()
     if base == 'requirements.txt' or base.endswith('.pyproject') or base.endswith('poetry.lock'):
         return ['Python']
-    if base == 'package.json' or base == 'package-lock.json' or base == 'pnpm-lock.yaml' or base == 'yarn.lock':
+    if base in ('package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'):
         return ['JavaScript', 'Node.js']
     if base == 'pom.xml' or base.endswith('.gradle') or base.endswith('build.gradle.kts'):
         return ['Java']
@@ -85,8 +79,6 @@ def detect_langs_from_deps(deps_file: str) -> list:
     # default unknown
     return []
 
-=======
->>>>>>> 9689fad (testfly)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Генерация отчётов *.xlsx и *.odt по SBOM с подписью")
@@ -102,7 +94,6 @@ if __name__ == "__main__":
 
     base_dir = Path(__file__).resolve().parent
 
-<<<<<<< HEAD
     # optional environment setup for SecGenSBOM
     if args.setup_env:
         logging.info("Настройка служебных директорий SecGenSBOM...")
@@ -115,16 +106,9 @@ if __name__ == "__main__":
     odt_dir = out_root / ODT_DIR
     excel_dir.mkdir(parents=True, exist_ok=True)
     odt_dir.mkdir(parents=True, exist_ok=True)
-=======
-    # demo git SBOM -> reports/git
-    process_sboms(
-        str(base_dir.parent / "sbom" / "git"), str(base_dir.parent / "reports" / "git")
-    )
->>>>>>> 9689fad (testfly)
 
     src_langs = detect_langs_from_deps(args.deps) if args.deps else []
 
-<<<<<<< HEAD
     signer_opts = None
     if args.sign:
         signer_opts = {
@@ -132,13 +116,6 @@ if __name__ == "__main__":
             'public_key_path': args.public_key,
             'key_passphrase': args.passphrase,
         }
-=======
-    # demo images SBOM -> reports/images
-    process_sboms(
-        str(base_dir.parent / "sbom" / "images"),
-        str(base_dir.parent / "reports" / "images"),
-    )
->>>>>>> 9689fad (testfly)
 
     if args.bom:
         # If a single file is provided, process it; if a directory, process all
@@ -160,13 +137,12 @@ if __name__ == "__main__":
                     dep = Dependency(
                         name=c.get("name", ""),
                         version=c.get("version", ""),
-                        dep_type=c.get("properties", []) if isinstance(c.get("properties"), list) else [],
-                        purl=c.get("purl"),
-                        path_to_sbom=args.bom,
+                        depType=c.get("properties", []) if isinstance(c.get("properties"), list) else [],
+                        purl=c.get("purl") or "",
+                        pathToSbom=args.bom,
                     )
                     if src_langs:
-                        setattr(dep, 'src_langs', src_langs)
-                    setattr(dep, 'source', c.get('purl') or c.get('supplier') or '')
+                        dep.srcLangs = src_langs
                     all_dependencies.append(dep)
                 exporter = Exporter(
                     all_dependencies,
@@ -179,13 +155,11 @@ if __name__ == "__main__":
                 exporter.exportToExcel(excel_name)
                 exporter.exportToOdt(odt_name)
     else:
-        # fallback to demo directories as before
+        # fallback to demo directories
         logging.info("Старт ручной обработки SBOM файлов (sbom/)")
-        # demo git SBOM -> reports/git
         process_sboms(str(base_dir.parent / "sbom" / "git"),
                       str(base_dir.parent / "reports" / "git"), signer_opts=signer_opts)
         logging.info("Переходим к images")
-        # demo images SBOM -> reports/images
         process_sboms(str(base_dir.parent / "sbom" / "images"),
                       str(base_dir.parent / "reports" / "images"), signer_opts=signer_opts)
         logging.info("Ручная обработка sbom/ завершена")

@@ -72,21 +72,12 @@ class Exporter:
             self._ensure_directory_exists(report)
             rows = [
                 {
-<<<<<<< HEAD
                     self.columns[0]: i+1,
                     self.columns[1]: getattr(c, 'name', ''),
                     self.columns[2]: getattr(c, 'version', ''),
                     self.columns[3]: ", ".join(getattr(c, 'src_langs', getattr(c, 'srcLangs', [])) or []),
                     self.columns[4]: ", ".join(getattr(c, 'dep_type', getattr(c, 'depType', [])) or []),
                     self.columns[5]: getattr(c, 'source', getattr(c, 'purl', '')),
-=======
-                    self.columns[0]: i + 1,
-                    self.columns[1]: c.name,
-                    self.columns[2]: c.version,
-                    self.columns[3]: ", ".join(c.srcLangs),
-                    self.columns[4]: ", ".join(c.depType),
-                    self.columns[5]: c.source,
->>>>>>> 9689fad (testfly)
                 }
                 for i, c in enumerate(self.externalDepsList)
             ]
@@ -133,23 +124,12 @@ class Exporter:
 
             for i, c in enumerate(self.externalDepsList, start=1):
                 row = TableRow()
-<<<<<<< HEAD
                 name = getattr(c, 'name', '')
                 version = getattr(c, 'version', '')
                 langs = ", ".join(getattr(c, 'src_langs', getattr(c, 'srcLangs', [])) or [])
                 dep_type = ", ".join(getattr(c, 'dep_type', getattr(c, 'depType', [])) or [])
                 source = getattr(c, 'source', getattr(c, 'purl', ''))
                 rowData = [i, name, version, langs, dep_type, source]
-=======
-                rowData = [
-                    i,
-                    c.name,
-                    c.version,
-                    ", ".join(c.srcLangs),
-                    ", ".join(c.depType),
-                    c.source,
-                ]
->>>>>>> 9689fad (testfly)
                 for cellValue in rowData:
                     cell = TableCell(stylename=cellStyle)
                     cell.addElement(P(text=str(cellValue)))
