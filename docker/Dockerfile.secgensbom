@@ -1,15 +1,13 @@
 FROM python:3.12-slim
 
+# --- Системные зависимости + Docker CLI + Trivy + Node.js (cdxgen fallback) ---
 RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    curl \
-    gnupg \
-    git \
-    jq \
+    ca-certificates curl gnupg git jq \
  && mkdir -p /etc/apt/keyrings \
  && curl -fsSL https://download.docker.com/linux/debian/gpg \
     | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
- && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+    https://download.docker.com/linux/debian \
     $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
     > /etc/apt/sources.list.d/docker.list \
  && apt-get update && apt-get install -y docker-ce-cli \
@@ -19,41 +17,32 @@ RUN apt-get update && apt-get install -y \
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
     | sh -s -- -b /usr/local/bin
 
-# Node LTS + npx (для cdxgen)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get update && apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
+# Node.js LTS + npx (cdxgen для non-Python проектов)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+ && apt-get install -y nodejs \
+ && rm -rf /var/lib/apt/lists/*
 
-# Для linux-контейнера на Apple Silicon убираем прямой бинарник CycloneDX CLI
-# RUN curl -L https://github.com/CycloneDX/cyclonedx-cli/releases/latest/download/cyclonedx-linux-x64 \
-#     -o /usr/local/bin/cyclonedx && \
-#     chmod +x /usr/local/bin/cyclonedx
-
-# Clairctl (CLI для Clair)
-# ARG CLAIRCTL_VERSION=1.5.4
-# RUN curl -sSL "https://github.com/quay/clair/releases/download/v${CLAIRCTL_VERSION}/clairctl-linux-arm64.tar.gz" \
-#     -o /tmp/clairctl.tar.gz && \
-#     tar -xzf /tmp/clairctl.tar.gz -C /usr/local/bin clairctl && \
-#     chmod +x /usr/local/bin/clairctl && \
-#     rm -f /tmp/clairctl.tar.gz
-
+# --- Python-пакет sbom-pipeline ---
 WORKDIR /app
-COPY . /app
+COPY pyproject.toml ./
+COPY src/ ./src/
 
-WORKDIR /app/script
-RUN python -m pip install --upgrade pip && \
-    if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -e .
 
-WORKDIR /app/secgensbom
-RUN chmod +x *.sh
-
-ENV REPO_ROOT=/app \
+# --- Переменные по умолчанию ---
+ENV PYTHONUNBUFFERED=1 \
+    REPO_ROOT=/app \
     PROJECT_DIR=/app/project_inject \
-    SCRIPT_DIR=/app/script \
-    IMAGE_NAME=sbom-formatter:inside \
     OUTPUT_DIR=/app/secgensbom_out \
-    SBOM_DIR=/app/sbom \
-    REPORTS_DIR=/app/reports
+    REPORTS_DIR=/app/secgensbom_reports \
+    SOURCE=local \
+    SKIP_CLAIR=true
+# Примечание: монтируй свой проект в /app/project_inject через -v.
+# Демо-проект доступен внутри образа в /app/examples/project_inject.
 
-WORKDIR /app
-ENTRYPOINT ["/bin/bash"]
+# --- Монтируемые директории ---
+VOLUME ["/app/project_inject", "/app/secgensbom_out", "/app/secgensbom_reports"]
+
+ENTRYPOINT ["sbom-pipeline"]
+CMD ["run"]

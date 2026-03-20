@@ -1,13 +1,18 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-COPY script/ /app/script
 
-WORKDIR /app/script
-RUN python -m pip install --upgrade pip && \
-    if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+COPY pyproject.toml ./
+COPY src/ ./src/
 
-ENV PYTHONUNBUFFERED=1
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -e .
 
-WORKDIR /app/script
-ENTRYPOINT ["python", "formatter.py"]
+ENV PYTHONUNBUFFERED=1 \
+    OUTPUT_DIR=/app/secgensbom_out \
+    REPORTS_DIR=/app/secgensbom_reports
+
+VOLUME ["/app/sbom", "/app/secgensbom_out", "/app/secgensbom_reports", "/app/reports"]
+
+ENTRYPOINT ["sbom-pipeline"]
+CMD ["format"]

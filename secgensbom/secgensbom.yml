@@ -1,45 +1,12 @@
-# GitLab CI include for running SecGenSBOM pipeline
-# This job runs pipeline.sh inside the repo and collects artifacts:
-# - secgensbom_out/*.json (cyclonedx SBOM)
-# - secgensbom_out/dep-check/*, secgensbom_out/trivy/*, secgensbom_out/clair/* (raw scanner reports)
-# - secgensbom_reports/* (xlsx/odt reports)
+# GitLab CI include for SecGenSBOM pipeline
+# Usage in your project's .gitlab-ci.yml:
+#   include:
+#     - project: 'your-group/sbom_genformatter'
+#       file: 'secgensbom/secgensbom.yml'
 
 stages:
   - build
   - secgensbom
-
-secgensbom_pipeline:
-  stage: secgensbom
-  image: "${DOCKER_REGISTRY}/secgensbom/secgensbom-sca:${CI_COMMIT_SHORT_SHA:-latest}"
-  services:
-    - docker:dind
-  variables:
-    DOCKER_DRIVER: overlay2
-    # Docker registry settings (override via CI variables)
-    DOCKER_REGISTRY: ""
-    DOCKER_USER: ""
-    DOCKER_PASSWORD: ""
-  script:
-    - |
-      if [ -n "$DOCKER_REGISTRY" ] && [ -n "$DOCKER_USER" ]; then
-        echo "Logging into Docker registry $DOCKER_REGISTRY"
-        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin "$DOCKER_REGISTRY"
-      else
-        echo "DOCKER_REGISTRY not configured — assuming image is available or using fallback tools"
-      fi
-    - apk add --no-cache python3 py3-pip nodejs npm
-    - chmod +x secgensbom/pipeline.sh
-    # pass CI_PROJECT_DIR so outputs are written into the importing project workspace
-    - ./secgensbom/pipeline.sh "$CI_PROJECT_DIR"
-  artifacts:
-    when: always
-    paths:
-      - secgensbom_out/*.json
-      - secgensbom_out/dep-check/*
-      - secgensbom_out/trivy/*
-      - secgensbom_out/clair/*
-      - secgensbom_reports/*
-    expire_in: 1 week
 
 build_sca_image:
   stage: build
@@ -52,24 +19,54 @@ build_sca_image:
     DOCKER_USER: ""
     DOCKER_PASSWORD: ""
   script:
-    - echo "Building SCA image from resolve/SCA.Dockerfile"
-    - docker build -t "secgensbom-sca:${CI_COMMIT_SHORT_SHA:-latest}" -f resolve/SCA.Dockerfile .
+    - docker build -t "secgensbom-sca:${CI_COMMIT_SHORT_SHA:-latest}" -f docker/Dockerfile.secgensbom .
     - |
       if [ -n "$DOCKER_REGISTRY" ] && [ -n "$DOCKER_USER" ]; then
-        REPO="$DOCKER_REGISTRY/secgensbom"
-        IMAGE_TAG="$REPO/secgensbom-sca:${CI_COMMIT_SHORT_SHA:-latest}"
-        echo "Tagging image as $IMAGE_TAG"
+        IMAGE_TAG="$DOCKER_REGISTRY/$CI_PROJECT_NAMESPACE/secgensbom-sca:${CI_COMMIT_SHORT_SHA:-latest}"
         docker tag "secgensbom-sca:${CI_COMMIT_SHORT_SHA:-latest}" "$IMAGE_TAG"
-        echo "Logging into registry $DOCKER_REGISTRY"
         echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin "$DOCKER_REGISTRY"
-        echo "Pushing image to registry: $IMAGE_TAG"
         docker push "$IMAGE_TAG"
       else
-        echo "DOCKER_REGISTRY not configured — saving image as tar artifact"
-        docker save "secgensbom-sca:${CI_COMMIT_SHORT_SHA:-latest}" -o secgensbom-sca.tar || true
+        docker save "secgensbom-sca:${CI_COMMIT_SHORT_SHA:-latest}" -o secgensbom-sca.tar
       fi
   artifacts:
     when: always
     paths:
       - secgensbom-sca.tar
+    expire_in: 1 week
+
+secgensbom_pipeline:
+  stage: secgensbom
+  image: python:3.12-slim
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    SOURCE: "local"
+    GIT_URL: ""
+    GIT_TOKEN: ""
+    GIT_BRANCH: ""
+    SKIP_CLAIR: "true"
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl git
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh
+        | sh -s -- -b /usr/local/bin
+    - pip install --quiet -e .
+  script:
+    - |
+      sbom-pipeline run \
+        --source "${SOURCE:-local}" \
+        ${GIT_URL:+--url "$GIT_URL"} \
+        ${GIT_TOKEN:+--token "$GIT_TOKEN"} \
+        ${GIT_BRANCH:+--branch "$GIT_BRANCH"} \
+        --output-dir "$CI_PROJECT_DIR/secgensbom_out" \
+        --reports-dir "$CI_PROJECT_DIR/secgensbom_reports"
+  artifacts:
+    when: always
+    paths:
+      - secgensbom_out/*.json
+      - secgensbom_out/trivy/
+      - secgensbom_out/dependency-check/
+      - secgensbom_out/clair/
+      - secgensbom_reports/
     expire_in: 1 week

@@ -1,499 +1,285 @@
 <div align="center">
-<h1><a id="intro"> SBOM Generator & Formatter  <sup></sup></a><br></h1>
+<h1><a id="intro">SBOM Generator & Formatter</a></h1>
 <a href="https://docs.github.com/en"><img src="https://img.shields.io/static/v1?logo=github&logoColor=fff&label=&message=Docs&color=36393f&style=flat" alt="GitHub Docs"></a>
-<a href="https://daringfireball.net/projects/markdown"><img src="https://img.shields.io/static/v1?logo=markdown&logoColor=fff&label=&message=Markdown&color=36393f&style=flat" alt="Markdown"></a> 
-<a href="https://symbl.cc/en/unicode-table"><img src="https://img.shields.io/static/v1?logo=unicode&logoColor=fff&label=&message=Unicode&color=36393f&style=flat" alt="Unicode"></a> 
-<a href="https://shields.io"><img src="https://img.shields.io/static/v1?logo=shieldsdotio&logoColor=fff&label=&message=Shields&color=36393f&style=flat" alt="Shields"></a>
-<img src="https://img.shields.io/badge/Contributor-Шмаков_И._С.-8b9aff" alt="Contributor Badge"></a></div>
+<a href="https://daringfireball.net/projects/markdown"><img src="https://img.shields.io/static/v1?logo=markdown&logoColor=fff&label=&message=Markdown&color=36393f&style=flat" alt="Markdown"></a>
+<img src="https://img.shields.io/badge/Contributor-Шмаков_И._С.-8b9aff" alt="Contributor Badge">
+</div>
 
 <div align="center">
-<img src="https://img.shields.io/github/repo-size/geminishkv/sbom_genform" alt="repo size"></a>
-<img src="https://img.shields.io/github/last-commit/geminishkv/sbom_genform" alt="repo size"></a>
-<img src="https://img.shields.io/github/commit-activity/m/geminishkv/sbom_genform" alt="repo size"></a>
-<img src="https://img.shields.io/github/issues-pr/geminishkv/sbom_genform"></a>
-<img src="https://img.shields.io/github/contributors/geminishkv/sbom_genform"></a></div>
+<img src="https://img.shields.io/github/repo-size/geminishkv/sbom_genform" alt="repo size">
+<img src="https://img.shields.io/github/last-commit/geminishkv/sbom_genform" alt="last commit">
+<img src="https://img.shields.io/github/commit-activity/m/geminishkv/sbom_genform" alt="commit activity">
+<img src="https://img.shields.io/github/issues-pr/geminishkv/sbom_genform">
+<img src="https://img.shields.io/github/contributors/geminishkv/sbom_genform">
+</div>
 
 ***
 
-<br>Салют :wave:,</br>
-Инструмент для обработки и анализа SBOM (Software Bill of Materials) файлов с экспортом результатов в различные форматы. Проект посвящен созданию SBOM по проекту в `project_inject` и форматирования отчетов в `.xslx`, .`odt`. 
+Инструмент для генерации, анализа и форматирования **Software Bill of Materials (SBOM)**.
+Полный Python-пайплайн — без shell-скриптов.
 
-> В отчетах дорабатывается генерация выявленных уязвимостей (**доработываеся**). **Описание будет добавлено**.
-
-* formatter.py: логгер, dotenv, DetsMemory, основной запуск
-* exporter.py: pandas+ODF для отчетов
-* sbom_handler.py: файловые операции, парсинг JSON
-* dependency.py: обработка каждой зависимости, http-запросы, BeautifulSoup и purl
-* utils.py: функции для парсинга, обработки строк, вспомогательные утилиты
-* reports/ и /sbom для скрипта, что бы подложить для проверки
-* pipeline.sh для сборки SBOM и подписания, прогона SCA и Container Security toolchain
-* readJson загружает JSON-файл SBOM для дальнейшей работы и определяется название, версия, тип зависимости и путь
-* конвертация SBOM в отчёты формата XLSX и ODT
-* в каталоге `project_inject/` должен быть код исследуемого приложения с `composer.json`
-
-<div align="center"><h3>Stay tuned ;)</h3></div> 
-
-![Logo](assets/logotype/logo2.jpg)
+**Что делает:**
+- Генерирует SBOM из локальной директории или Git-репозитория (GitHub / GitLab)
+- Сканирует уязвимости через **Trivy**, **OWASP Dependency-Check**, **Clair**
+- Встраивает найденные уязвимости в SBOM (CycloneDX 1.5)
+- Экспортирует читаемые отчёты: **Excel (.xlsx)**, **Word (.docx)**, **ODT (.odt)** — компоненты + уязвимости
+- Подписывает итоговый SBOM (SHA-256)
 
 ***
 
-### Что открыть, чтобы посмотреть результат
+## Структура репозитория
 
-* SBOM:
-    * `secgensbom_out/app-bom-cdxgen.json`
-    * `secgensbom_out/merged-bom-signed.json`
-    * `secgensbom_out/app-bom-dedup.json`
-* Отчёты по уязвимостям:
-    * `secgensbom_out/dependency-check/*`
-    * `secgensbom_out/trivy/*`
-    * `secgensbom_out/clair/*`
-* Конвертированные отчёты:
-    * по результатам пайплайна: `secgensbom_reports/excel|odt/*.xlsx|*.odt`
-    * по демо-SBOM: `reports/git/...`, `reports/images/...`
-
-***
-
-### Структура репозитория
-
-```bash
-├── assets
-│   └── logotype
-│       ├── logo.jpg
-│       └── logo2.jpg
-├── cheatsheet
-│   ├── CHEATSHEET_DOCKER.md
-│   └── CHEATSHEET_DOCKERIGNORE.md
-├── CODE_OF_CONDUCT.md
-├── CONTRIBUTING.md
-├── Dockerfile.formatter
-├── Dockerfile.secgensbom
-├── LICENSE.md
-├── NOTICE.md
-├── project_inject # vulnerability project to insert
-│   ├── add.php
-│   ├── composer.json
-│   ├── composer.lock
-│   ├── config
-│   │   └── db_connect
-│   ├── delete_story.php
-│   ├── details.php
-│   ├── edit_story.php
-│   ├── edit.php
-│   ├── en
-│   ├── hackers.sql
-│   ├── idea.php
-│   ├── img
-│   │   ├── book-4986 (1).png
-│   │   ├── book-4986 (2).png
-│   │   ├── book-4986.png
-│   │   └── pizza.svg
-│   ├── index.php
-│   ├── login.php
-│   ├── logout.php
-│   ├── profile.php
-│   ├── README.md
-│   ├── reports.php
-│   ├── search.php
-│   ├── sign.php
-│   ├── templates
-│   │   ├── footer.php
-│   │   └── header.php
-│   ├── userSearch.php
-│   └── xmlEx.xml
-├── README.md
-├── reports # reports by manual_formatter.py
-│   ├── git
-│   │   ├── excel
-│   │   │   ├── sbom-git-fullstack.xlsx
-│   │   │   ├── sbom-git-minimal.xlsx
-│   │   │   ├── sbom-git-overlap.xlsx
-│   │   │   ├── sbom-git-sample .xlsx
-│   │   │   └── sbom-git-transitive.xlsx
-│   │   └── odt
-│   │       ├── sbom-git-fullstack.odt
-│   │       ├── sbom-git-minimal.odt
-│   │       ├── sbom-git-overlap.odt
-│   │       ├── sbom-git-sample .odt
-│   │       └── sbom-git-transitive.odt
-│   └── images
-│       ├── excel
-│       │   ├── sbom-image-backend-multistage .xlsx
-│       │   ├── sbom-image-critical.xlsx
-│       │   ├── sbom-image-frontend-node.xlsx
-│       │   └── sbom-image-sample.xlsx
-│       └── odt
-│           ├── sbom-image-backend-multistage .odt
-│           ├── sbom-image-critical.odt
-│           ├── sbom-image-frontend-node.odt
-│           └── sbom-image-sample.odt
-├── resolve # nextstep
-│   └── SCA.Dockerfile
-├── sbom
-│   ├── git
-│   │   ├── sbom-git-fullstack.json
-│   │   ├── sbom-git-minimal.json
-│   │   ├── sbom-git-overlap.json
-│   │   ├── sbom-git-sample.json
-│   │   └── sbom-git-transitive.json
-│   └── images
-│       ├── sbom-image-backend-multistage.json
-│       ├── sbom-image-critical.json
-│       ├── sbom-image-frontend-node.json
-│       └── sbom-image-sample.json
-├── script # formatter logic
-│   ├── app.log
-│   ├── dependency.py # обработка зависимостей
-│   ├── exporter.py # экспорт отчетов
-│   ├── formatter.py # auto
-│   ├── manual_formatter.py # manual
-│   ├── requirements.txt
-│   ├── sbom_handler.py # работа с SBOM-файлами
-│   ├── setup_secgensbom_env.py
-│   └── utils.py
-├── secgensbom # custom logic pipeline secgensbom
-│   ├── config.env
-│   ├── pipeline.sh
-│   ├── sbom_dedup.sh
-│   ├── sbom_generate.sh
-│   ├── sbom_merge_sign.sh
-│   ├── sca_entrypoint.sh
-│   ├── scan_clair.sh
-│   ├── scan_dependency_check.sh
-│   └── scan_trivy.sh
-├── secgensbom_out # artifacts by pipeline.sh
-│   ├── app-bom-cdxgen.json # main SBOM
-│   ├── app-bom-dedup.json # дедупликация
-│   ├── clair
-│   ├── dependency-check
-│   │   ├── dependency-check-gitlab.json
-│   │   ├── dependency-check-jenkins.html
-│   │   ├── dependency-check-junit.xml
-│   │   ├── dependency-check-report.csv
-│   │   ├── dependency-check-report.html
-│   │   ├── dependency-check-report.json
-│   │   ├── dependency-check-report.sarif
-│   │   └── dependency-check-report.xml
-│   ├── merged-bom-signed.json # sign and dedup SBOM
-│   └── trivy
-│       ├── sbom-vulns.json
-│       └── trivy-fs.json
-├── secgensbom_reports
-│   ├── excel
-│   │   ├── app-bom-cdxgen.xlsx
-│   │   ├── app-bom-dedup.xlsx
-│   │   └── merged-bom-signed.xlsx
-│   └── odt
-│       ├── app-bom-cdxgen.odt
-│       ├── app-bom-dedup.odt
-│       └── merged-bom-signed.odt
-└── SECURITY.md
+```
+sbom_genformatter/
+├── src/sbom_pipeline/          # Python-пакет (основная логика)
+│   ├── cli.py                  # CLI: sbom-pipeline run | format | verify
+│   ├── pipeline.py             # Оркестратор пайплайна
+│   ├── generate.py             # Генерация SBOM (cdxgen / cyclonedx-py)
+│   ├── dedup.py                # Дедупликация компонентов
+│   ├── sign.py                 # SHA-256 подпись
+│   ├── exporter.py             # Экспорт отчётов (xlsx / docx / odt)
+│   ├── vuln_merger.py          # Встраивание уязвимостей в SBOM
+│   ├── dependency.py           # PURL → язык + источник
+│   ├── config.py               # Конфигурация из env / CLI
+│   ├── constants.py            # Общие константы
+│   ├── sbom_handler.py         # Чтение/запись SBOM JSON
+│   ├── utils.py                # Утилиты
+│   └── scanner/
+│       ├── trivy.py            # Trivy (fs + sbom)
+│       ├── clair.py            # Clair (container image, опционально)
+│       └── depcheck.py         # OWASP Dependency-Check
+├── docker/
+│   ├── Dockerfile.secgensbom   # Образ для полного пайплайна
+│   └── Dockerfile.formatter    # Образ только для форматирования
+├── examples/
+│   └── project_inject/         # Уязвимый PHP-проект для демо/тестирования
+├── secgensbom/
+│   └── secgensbom.yml          # GitLab CI include
+├── .github/workflows/
+│   └── secgensbom.yml          # GitHub Actions workflow
+├── pyproject.toml              # Конфигурация пакета
+└── .env.example                # Шаблон переменных окружения
 ```
 
 ***
 
-### Tutorial
+## Быстрый старт
 
-* submodules
+### Установка
 
 ```bash
-$ git submodule init
-$ git submodule update
+python3 -m venv venv
+source venv/bin/activate
+pip install -e .
 ```
 
-* Работа из окружения
+### Запуск пайплайна
 
+**Из локальной директории (демо-проект):**
 ```bash
-$ python3 -m venv venv 
-$ source venv/bin/activate
-$ python -m pip install --upgrade pip
-<<<<<<< HEAD
-$ pip install -r requirements.txt
-$ python formatter.py
-$ deactivate
-=======
-$ cd scripts && pip install -r requirements.txt
-$ python formatter.py
->>>>>>> 9689fad (testfly)
-```
-* Сборка Docker для formatter
-
-```bash
-$ docker build -f Dockerfile.formatter -t sbom-formatter:latest .
-
-$ docker run --rm -it \
-  -v "$(pwd)/sbom:/app/sbom" \
-  -v "$(pwd)/reports:/app/reports" \
-  sbom-formatter:latest
+sbom-pipeline run
+# эквивалентно:
+sbom-pipeline run --path examples/project_inject
 ```
 
-* Сначала делаем руками и после можно автоматически так
-
+**Из GitHub-репозитория:**
 ```bash
-$ python3 script/setup_secgensbom_env.py
-$ vim ~/.zshrc
-# либо
-$ vim ~/.bashrc
-
-# Вставить вот это
-
-secgensbom_env() {
-  local out
-  out="$(python3 script/setup_secgensbom_env.py)"
-  eval "export ${out//$'\n'/; export }"
-}
-
-$ source ~/.zshrc
-# либо
-$ source ~/.bashrc
+sbom-pipeline run \
+  --source github \
+  --url https://github.com/org/repo \
+  --token ghp_...
 ```
 
-*  secgensbom pipeline.sh
-
+**Из GitLab-репозитория:**
 ```bash
-# Запуск и сборка
-
-$ docker build -f Dockerfile.secgensbom -t secgensbom-tool:latest .
-
-$ mkdir -p project_inject
-$ mkdir -p secgensbom_out
-$ mkdir -p secgensbom_out/dependency-check
-$ mkdir -p secgensbom_out/trivy
-$ mkdir -p secgensbom_out/clair
-$ mkdir -p .dependency-check-data
-
-# Clair на docker-compose при поднятии двух серверов
-
-$ export HOST_PROJECT_DIR="$(pwd)/project_inject"
-$ export HOST_OUTPUT_DIR="$(pwd)/secgensbom_out"
-$ export HOST_DEP_REPORT_DIR="$(pwd)/secgensbom_out/dependency-check"
-$ export HOST_TRIVY_REPORT_DIR="$(pwd)/secgensbom_out/trivy"
-$ export DEP_CHECK_DATA="$(pwd)/.dependency-check-data"
-
-# Образ, который будет сканировать Clair
-$ export IMAGE_NAME="your-app-image:tag"
-
-# Endpoint Clair-сервера
-$ export CLAIR_ENDPOINT="http://clair:8080"
-
-$ docker run --rm -it \
-  -v "$(pwd)/project_inject:/app/project_inject" \
-  -v "$(pwd)/reports:/app/reports" \
-  -v "$(pwd)/secgensbom_out:/app/secgensbom_out" \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e PROJECT_DIR="/app/project_inject" \
-  -e HOST_PROJECT_DIR="${HOST_PROJECT_DIR}" \
-  -e HOST_OUTPUT_DIR="${HOST_OUTPUT_DIR}" \
-  -e HOST_DEP_REPORT_DIR="${HOST_DEP_REPORT_DIR}" \
-  -e HOST_TRIVY_REPORT_DIR="${HOST_TRIVY_REPORT_DIR}" \
-  -e DEP_CHECK_DATA="${DEP_CHECK_DATA}" \
-  -e OUTPUT_DIR="/app/secgensbom_out" \
-  -e IMAGE_NAME="${IMAGE_NAME}" \
-  -e CLAIR_ENDPOINT="${CLAIR_ENDPOINT}" \
-  secgensbom-tool:latest \
-  /app/secgensbom/pipeline.sh
-
-# Дедупликация
-$ docker run --rm -it \
-  -v "$(pwd)/secgensbom_out:/app/secgensbom_out" \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e OUTPUT_DIR="/app/secgensbom_out" \
-  secgensbom-tool:latest \
-  /app/secgensbom/sbom_dedup.sh
+sbom-pipeline run \
+  --source gitlab \
+  --url https://gitlab.com/org/repo \
+  --token glpat-...
 ```
 
-*  Без Clair - когда clairctl недоступен без docker-compose, шаг логируется как “ошибка, пропущен”
-
+**Только форматирование готовых SBOM:**
 ```bash
-$ mkdir -p project_inject
-$ mkdir -p secgensbom_out
-$ mkdir -p secgensbom_out/dependency-check
-$ mkdir -p secgensbom_out/trivy
-$ mkdir -p .dependency-check-data
-
-$ docker build -f Dockerfile.secgensbom -t secgensbom-tool:latest .
-
-$ export HOST_PROJECT_DIR="$(pwd)/project_inject"
-$ export HOST_OUTPUT_DIR="$(pwd)/secgensbom_out"
-$ export HOST_DEP_REPORT_DIR="$(pwd)/secgensbom_out/dependency-check"
-$ export HOST_TRIVY_REPORT_DIR="$(pwd)/secgensbom_out/trivy"
-$ export DEP_CHECK_DATA="$(pwd)/.dependency-check-data"
-
-$ docker run --rm -it \
-  -v "$(pwd)/project_inject:/app/project_inject" \
-  -v "$(pwd)/reports:/app/reports" \
-  -v "$(pwd)/secgensbom_out:/app/secgensbom_out" \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e PROJECT_DIR="/app/project_inject" \
-  -e HOST_PROJECT_DIR="${HOST_PROJECT_DIR}" \
-  -e HOST_OUTPUT_DIR="${HOST_OUTPUT_DIR}" \
-  -e HOST_DEP_REPORT_DIR="${HOST_DEP_REPORT_DIR}" \
-  -e HOST_TRIVY_REPORT_DIR="${HOST_TRIVY_REPORT_DIR}" \
-  -e DEP_CHECK_DATA="${DEP_CHECK_DATA}" \
-  -e OUTPUT_DIR="/app/secgensbom_out" \
-  secgensbom-tool:latest \
-  /app/secgensbom/pipeline.sh
-
-# Дедупликация
-$ docker run --rm -it \
-  -v "$(pwd)/secgensbom_out:/app/secgensbom_out" \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e OUTPUT_DIR="/app/secgensbom_out" \
-  secgensbom-tool:latest \
-  /app/secgensbom/sbom_dedup.sh
+sbom-pipeline format \
+  --sbom-dir secgensbom_out \
+  --report-dir secgensbom_reports
 ```
 
-* formatter на артефакты secgensbom_out
+**Проверка подписи SBOM:**
+```bash
+sbom-pipeline verify secgensbom_out/merged-bom-signed.json
+```
 
 ```bash
-$ mkdir -p secgensbom_reports/excel
-$ mkdir -p secgensbom_reports/odt
+sbom-pipeline run --help
+```
 
-$ docker build -f Dockerfile.formatter -t sbom-formatter:latest .
-$ docker run --rm -it \
-  -v "$(pwd)/script:/app/script" \
-  -v "$(pwd)/sbom:/app/sbom" \
-  -v "$(pwd)/reports:/app/reports" \
+***
+
+## Выходные артефакты
+
+### SBOM
+
+| Файл | Описание |
+|---|---|
+| `secgensbom_out/app-bom-cdxgen.json` | Исходный SBOM (cdxgen) |
+| `secgensbom_out/app-bom-dedup.json` | После дедупликации |
+| `secgensbom_out/merged-bom-signed.json` | Подписанный SBOM с уязвимостями |
+| `secgensbom_out/merged-bom-signed.sig` | SHA-256 контрольная сумма |
+| `secgensbom_out/vulns-normalized.json` | Нормализованные уязвимости (все сканеры) |
+
+### Отчёты сканеров
+
+| Путь | Сканер |
+|---|---|
+| `secgensbom_out/trivy/trivy-fs.json` | Trivy — файловая система |
+| `secgensbom_out/trivy/sbom-vulns.json` | Trivy — анализ SBOM |
+| `secgensbom_out/dependency-check/` | OWASP Dependency-Check (все форматы) |
+| `secgensbom_out/clair/` | Clair (если включён) |
+
+### Читаемые отчёты
+
+| Путь | Формат | Содержимое |
+|---|---|---|
+| `secgensbom_reports/excel/*.xlsx` | Excel | Лист 1: компоненты, Лист 2: уязвимости |
+| `secgensbom_reports/docx/*.docx` | Word | Таблица компонентов + таблица уязвимостей |
+| `secgensbom_reports/odt/*.odt` | ODT | То же самое |
+
+***
+
+## Docker
+
+### Полный пайплайн
+
+```bash
+docker build -f docker/Dockerfile.secgensbom -t secgensbom-tool:latest .
+
+# Локальный проект
+docker run --rm \
+  -v "$(pwd)/examples/project_inject:/app/project_inject" \
   -v "$(pwd)/secgensbom_out:/app/secgensbom_out" \
   -v "$(pwd)/secgensbom_reports:/app/secgensbom_reports" \
-  sbom-formatter:latest \
-  python /app/script/formatter.py
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e SOURCE=local \
+  -e SKIP_CLAIR=true \
+  secgensbom-tool:latest run
+
+# GitHub
+docker run --rm \
+  -v "$(pwd)/secgensbom_out:/app/secgensbom_out" \
+  -v "$(pwd)/secgensbom_reports:/app/secgensbom_reports" \
+  -e SOURCE=github \
+  -e GIT_URL=https://github.com/org/repo \
+  -e GIT_TOKEN=ghp_... \
+  secgensbom-tool:latest run
 ```
 
-* manual_formatter
+### Только форматирование
 
 ```bash
-$ docker run --rm -it \
-  -v "$(pwd)/script:/app/script" \
-  -v "$(pwd)/sbom:/app/sbom" \
-  -v "$(pwd)/reports:/app/reports" \
-  sbom-formatter:latest \
-  python /app/script/manual_formatter.py
-```
+docker build -f docker/Dockerfile.formatter -t sbom-formatter:latest .
 
-* Очистка кеша hard
-
-```bash
-$ docker builder prune -af
-$ docker system prune -af
+docker run --rm \
+  -v "$(pwd)/secgensbom_out:/app/secgensbom_out" \
+  -v "$(pwd)/secgensbom_reports:/app/secgensbom_reports" \
+  sbom-formatter:latest format
 ```
 
 ***
 
-### Clair
+## Переменные окружения
 
-* Завести учётку на quay.io, выдать token, сделать  docker login quay.io  на хосте
-* Вместо  latest  использовать конкретный тег, указаный в доке Clair ( v4.x.x  и т.д.).
-    * Поднять сам Clair (Postgres + Clair) по их docker-compose
-    * Настроить  CLAIR_ENDPOINT  и конфиг clairctl
+Скопируй `.env.example` → `.env` и заполни нужные значения.
+
+| Переменная | Описание | По умолчанию |
+|---|---|---|
+| `SOURCE` | Источник: `local` / `github` / `gitlab` | `local` |
+| `PROJECT_DIR` | Путь к проекту (local) | `examples/project_inject` |
+| `GIT_URL` | URL репозитория | — |
+| `GIT_TOKEN` | Токен GitHub / GitLab | — |
+| `GIT_BRANCH` | Ветка (HEAD если не указана) | — |
+| `OUTPUT_DIR` | Директория артефактов | `secgensbom_out` |
+| `REPORTS_DIR` | Директория отчётов | `secgensbom_reports` |
+| `IMAGE_NAME` | Docker-образ для Clair | — |
+| `CLAIR_ENDPOINT` | Endpoint Clair-сервера | `http://clair:8080` |
+| `SKIP_CLAIR` | Пропустить Clair | `true` |
+| `GITHUB_TOKEN` | API-токен для определения языков зависимостей | — |
 
 ***
 
-### Troubleshooting
+## Clair (опционально)
 
-* Docker Desktop на macOS сам подтянет x86‑слой  cyclonedx/cyclonedx-cli:latest и будет прогонять его через встроенную виртуализацию для amd64.
-* .DS_Store в каталогах, если глобально не потерт
+Для сканирования контейнерных образов через Clair нужен запущенный Clair + Postgres (docker-compose).
 
 ```bash
-rm sbom/git/.DS_Store
-find . -name ".DS_Store" -delete
+docker run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e SKIP_CLAIR=false \
+  -e IMAGE_NAME=your-app-image:tag \
+  -e CLAIR_ENDPOINT=http://clair:8080 \
+  secgensbom-tool:latest run
 ```
+
+Если Clair недоступен — шаг автоматически пропускается, пайплайн продолжает работу.
 
 ***
 
-### Интеграция с CI/CD
+## CI/CD
+
+### GitHub Actions
+
+Workflow запускается при пуше в `main`/`master` или вручную через **Actions → SecGenSBOM → Run workflow**.
+
+Артефакты доступны в **Actions → Run → Artifacts**:
+- `sbom-artifacts` — SBOM JSON + отчёты сканеров
+- `sbom-reports` — читаемые отчёты (xlsx / docx / odt)
+
+Секреты (`Settings → Secrets → Actions`):
+- `DOCKER_USER`, `DOCKER_PASSWORD` — для публикации образа в реестр
+- `GIT_TOKEN` — для сканирования приватных репозиториев
+
+### GitLab CI
 
 ```yaml
-<<<<<<< HEAD
-# Пример include для GitLab CI — файл secgensbom/secgensbom.yml
-## stages: build -> secgensbom
+include:
+  - project: 'your-group/sbom_genformatter'
+    file: 'secgensbom/secgensbom.yml'
 ```
 
-## CI: сборка и использование SCA образа (локальный Docker registry)
+Переменные CI (`Settings → CI/CD → Variables`):
+- `DOCKER_REGISTRY`, `DOCKER_USER`, `DOCKER_PASSWORD` — реестр образов
+- `GIT_TOKEN` — токен для приватных репо
 
-Добавлена поддержка автоматической сборки и публикации SCA-образа, используемого в `secgensbom` pipeline.
-
-- Сборка: stage `build`, job `build_sca_image` собирает образ из `resolve/SCA.Dockerfile`.
-- Публикация: при наличии переменных CI образ будет запушен в указанный реестр.
-- Использование: основной job `secgensbom_pipeline` запускается с `image` указывающим на собранный образ.
-
-Переменные CI (добавьте в GitLab -> Settings -> CI/CD -> Variables):
-
-- `DOCKER_REGISTRY` — адрес вашего Docker registry (например `registry.example.com:5000`).
-- `DOCKER_USER` — имя пользователя для реестра.
-- `DOCKER_PASSWORD` — пароль или токен для реестра.
-
-Как это работает
-
-- Job `build_sca_image`:
-  - Строит локально образ `secgensbom-sca:${CI_COMMIT_SHORT_SHA}`.
-  - Если заданы `DOCKER_REGISTRY` и `DOCKER_USER`, тегирует образ как `<DOCKER_REGISTRY>/secgensbom/secgensbom-sca:<sha>` и пушит.
-  - Если реестр не настроен — сохраняет `secgensbom-sca.tar` как артефакт.
-- Job `secgensbom_pipeline`:
-  - Использует в качестве `image` образ `<DOCKER_REGISTRY>/secgensbom/secgensbom-sca:<sha>` (переменная `DOCKER_REGISTRY` должна быть задана в CI).
-  - При логине в реестр используется `DOCKER_USER`/`DOCKER_PASSWORD`.
-
-Примеры использования
-
-1) Настройка GitLab CI (пример переменных):
-
-  - DOCKER_REGISTRY=registry.mycompany.local:5000
-  - DOCKER_USER=ci-bot
-  - DOCKER_PASSWORD=<masked-token>
-
-2) Тест локально (с Nexus/Harbor/другим registry):
-
-```bash
-export DOCKER_REGISTRY=registry.example.com:5000
-export DOCKER_USER=myuser
-export DOCKER_PASSWORD=mypassword
-
-# Сборка локально
-docker build -t secgensbom-sca:local -f resolve/SCA.Dockerfile .
-
-# Тегирование и пуш в реестр
-docker tag secgensbom-sca:local $DOCKER_REGISTRY/secgensbom/secgensbom-sca:local
-echo $DOCKER_PASSWORD | docker login -u $DOCKER_USER --password-stdin $DOCKER_REGISTRY
-docker push $DOCKER_REGISTRY/secgensbom/secgensbom-sca:local
-
-# Теперь в CI вы сможете использовать image: "$DOCKER_REGISTRY/secgensbom/secgensbom-sca:local"
-```
-
-3) Если реестр не доступен
-
-- Pipeline по-прежнему может работать: `build_sca_image` сохранит `secgensbom-sca.tar` как артефакт, который можно скачать и загрузить локально через `docker load -i secgensbom-sca.tar`.
-
-Советы
-
-- Убедитесь, что в реестре есть репозиторий `secgensbom` с типом Docker hosted.
-- Используйте маскированные CI-переменные (`masked`) для `DOCKER_PASSWORD`.
-- При использовании приватного реестра с самоподписанными сертификатами настройте доверие к сертификатам на раннерах GitLab.
-
-## GitHub Actions
-
-Добавлен workflow `.github/workflows/secgensbom.yml`, который выполняет те же шаги, что и GitLab CI:
-
-- Сборка SCA-образа из `resolve/SCA.Dockerfile`.
-- Публикация в реестр, если заданы секреты.
-- Запуск `secgensbom/pipeline.sh` после сборки.
-
-Для работы в GitHub Actions добавьте секреты репозитория (`Settings -> Secrets -> Actions`):
-
-- `DOCKER_USER` — пользователь для реестра.
-- `DOCKER_PASSWORD` — пароль/токен для реестра.
-
-Опционально задайте переменную окружения `DOCKER_REGISTRY` (в workflow через `env` или как repository secret) с адресом реестра (пример: `registry.example.com:5000`).
-
-Workflow можно запускать вручную через `Actions -> SecGenSBOM -> Run workflow`.
-
-=======
-
-```
-
->>>>>>> 9689fad (testfly)
 ***
 
+## Архитектура пайплайна
+
+```
+sbom-pipeline run
+    │
+    ├─ 1. generate.py     → app-bom-cdxgen.json
+    │     (cdxgen via npx  /  cyclonedx-py для Python  /  git clone)
+    │
+    ├─ 2. dedup.py        → app-bom-dedup.json
+    │     (дедупликация по PURL, чистый Python)
+    │
+    ├─ 3. sign.py         → merged-bom-signed.json + .sig
+    │     (SHA-256 в metadata.signature)
+    │
+    ├─ 4. scanner/
+    │     ├─ trivy.py     → trivy-fs.json, sbom-vulns.json
+    │     ├─ depcheck.py  → dependency-check-report.*
+    │     └─ clair.py     → clair-*.json  (опционально)
+    │
+    ├─ 5. vuln_merger.py  → встраивает vulnerabilities[] в SBOM
+    │
+    └─ 6. exporter.py     → .xlsx  /  .docx  /  .odt
+```
+
+***
 
 Copyright (c) 2025 Elijah S Shmakov
 
-
-![Logo](assets/logotype/logo.jpg)
+<div align="center">
+<img src="docs/assets/logo2.jpg" alt="Logo">
+</div>

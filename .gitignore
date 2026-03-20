@@ -23,11 +23,17 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
 
 # Secrets and environment configs
 .env
-.env.*
-*.env
+.env.local
 venv/
 .venv/
 
@@ -41,17 +47,14 @@ venv/
 logs/
 *.pid
 
-# Data exports
-*.odt
-*.xlsx
-*.xls
-reports/
-output/
-# sbom/git/*
-# sbom/images/*
+# Pipeline outputs (generated, not committed)
 secgensbom_out/
 secgensbom_reports/
+reports/
 .dependency-check-data/
+
+# Generated report files (keep examples/ intact)
+*.sig
 
 # Databases
 *.sqlite
@@ -72,6 +75,4 @@ secgensbom_reports/
 
 # Node.js
 node_modules/
-/node_modules
-dist/
-build/
+.claude/

@@ -21,39 +21,43 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to registry (if DOCKER_REGISTRY provided)
-        if: env.DOCKER_REGISTRY != '' && secrets.DOCKER_PASSWORD
-        uses: docker/login-action@v2
+      - name: Login to registry (if configured)
+        if: ${{ env.DOCKER_REGISTRY != '' && secrets.DOCKER_PASSWORD != '' }}
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build image
+      - name: Build secgensbom image
         run: |
-          docker build -t $IMAGE_NAME:${{ github.sha::8 }} -f resolve/SCA.Dockerfile .
+          docker build \
+            -t $IMAGE_NAME:${{ github.sha }} \
+            -f docker/Dockerfile.secgensbom .
 
       - name: Tag & push to registry
-        if: env.DOCKER_REGISTRY != '' && secrets.DOCKER_PASSWORD
+        if: ${{ env.DOCKER_REGISTRY != '' && secrets.DOCKER_PASSWORD != '' }}
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha::8 }} ${{ env.DOCKER_REGISTRY }}/${{ github.repository_owner }}/$IMAGE_NAME:${{ github.sha::8 }}
-          docker push ${{ env.DOCKER_REGISTRY }}/${{ github.repository_owner }}/$IMAGE_NAME:${{ github.sha::8 }}
+          FULL_TAG=${{ env.DOCKER_REGISTRY }}/${{ github.repository_owner }}/$IMAGE_NAME:${{ github.sha }}
+          docker tag $IMAGE_NAME:${{ github.sha }} $FULL_TAG
+          docker push $FULL_TAG
 
-      - name: Save image as artifact when registry not configured
-        if: env.DOCKER_REGISTRY == '' || !secrets.DOCKER_PASSWORD
+      - name: Save image as artifact (no registry)
+        if: ${{ env.DOCKER_REGISTRY == '' || secrets.DOCKER_PASSWORD == '' }}
+        run: |
+          docker save $IMAGE_NAME:${{ github.sha }} -o secgensbom-sca.tar
+
+      - name: Upload image artifact
+        if: ${{ env.DOCKER_REGISTRY == '' || secrets.DOCKER_PASSWORD == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: secgensbom-sca-image
-          path: |
-            # save the built image as tar
-            ${{ github.workspace }}/secgensbom-sca.tar
-        run: |
-          docker save $IMAGE_NAME:${{ github.sha::8 }} -o secgensbom-sca.tar || true
+          path: secgensbom-sca.tar
 
   run-pipeline:
     needs: build-and-push
@@ -62,20 +66,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download image artifact if present
-        if: needs.build-and-push.outputs.image_saved == 'true'
-        uses: actions/download-artifact@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          name: secgensbom-sca-image
+          python-version: "3.12"
 
-      - name: Load image if tar exists
-        if:  steps.download-artifact.conclusion == 'success' || ( !env.DOCKER_REGISTRY )
+      - name: Install sbom-pipeline
+        run: pip install -e .
+
+      - name: Install Trivy
         run: |
-          if [ -f secgensbom-sca.tar ]; then docker load -i secgensbom-sca.tar; fi
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin
 
-      - name: Run pipeline
+      - name: Run pipeline (local source = examples/project_inject)
         env:
-          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_CLAIR: "true"
         run: |
-          chmod +x secgensbom/pipeline.sh
-          ./secgensbom/pipeline.sh $GITHUB_WORKSPACE
+          sbom-pipeline run \
+            --source local \
+            --path examples/project_inject \
+            --output-dir $GITHUB_WORKSPACE/secgensbom_out \
+            --reports-dir $GITHUB_WORKSPACE/secgensbom_reports
+
+      - name: Upload SBOM artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-artifacts
+          path: |
+            secgensbom_out/*.json
+            secgensbom_out/trivy/
+            secgensbom_out/dependency-check/
+            secgensbom_out/clair/
+          expire_in: 1 week
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-reports
+          path: secgensbom_reports/
+          expire_in: 1 week
