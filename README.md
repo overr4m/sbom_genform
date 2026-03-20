@@ -281,5 +281,5 @@ sbom-pipeline run
 Copyright (c) 2025 Elijah S Shmakov
 
 <div align="center">
-<img src="docs/assets/logo2.jpg" alt="Logo">
+<img src="docs/assets/logo.jpg" alt="Logo">
 </div>
