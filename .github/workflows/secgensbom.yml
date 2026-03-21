@@ -4,7 +4,7 @@ name: SecGenSBOM
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [securitycheck]
 
 jobs:
   run-pipeline:
