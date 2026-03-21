@@ -33,7 +33,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # --- Python-пакет sbom-pipeline ---
 WORKDIR /app
-COPY pyproject.toml LICENSE.md ./
+COPY pyproject.toml LICENSE.md README.md ./
 COPY src/ ./src/
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir .
