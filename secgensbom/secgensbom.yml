@@ -1,7 +1,7 @@
 # GitLab CI include for SecGenSBOM pipeline
 # Usage in your project's .gitlab-ci.yml:
 #   include:
-#     - project: 'your-group/sbom_genformatter'
+#     - project: 'your-group/sbom_genform'
 #       file: 'secgensbom/secgensbom.yml'
 
 stages:

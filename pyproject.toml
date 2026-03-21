@@ -69,10 +69,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage     = "https://github.com/geminishkv/sbom_genformatter"
-Repository   = "https://github.com/geminishkv/sbom_genformatter"
-Issues       = "https://github.com/geminishkv/sbom_genformatter/issues"
-Changelog    = "https://github.com/geminishkv/sbom_genformatter/blob/master/CHANGELOG.md"
+Homepage     = "https://github.com/geminishkv/sbom_genform"
+Repository   = "https://github.com/geminishkv/sbom_genform"
+Issues       = "https://github.com/geminishkv/sbom_genform/issues"
+Changelog    = "https://github.com/geminishkv/sbom_genform/blob/master/CHANGELOG.md"
 
 # ---------------------------------------------------------------------------
 # Entry points — two aliases, one tool

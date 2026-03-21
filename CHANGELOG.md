@@ -48,5 +48,5 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Shell-script-based pipeline. See git history for details.
 
-[Unreleased]: https://github.com/geminishkv/sbom_genformatter/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/geminishkv/sbom_genformatter/releases/tag/v2.0.0
+[Unreleased]: https://github.com/geminishkv/sbom_genform/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/geminishkv/sbom_genform/releases/tag/v2.0.0

@@ -8,21 +8,21 @@
 </div>
 
 <div align="center">
-<img src="https://img.shields.io/github/repo-size/geminishkv/sbom_genformatter" alt="repo size">
-<img src="https://img.shields.io/github/last-commit/geminishkv/sbom_genformatter" alt="last commit">
-<img src="https://img.shields.io/github/commit-activity/m/geminishkv/sbom_genformatter" alt="commit activity">
-<img src="https://img.shields.io/github/issues-pr/geminishkv/sbom_genformatter" alt="open PRs">
-<img src="https://img.shields.io/github/contributors/geminishkv/sbom_genformatter" alt="contributors">
+<img src="https://img.shields.io/github/repo-size/geminishkv/sbom_genform" alt="repo size">
+<img src="https://img.shields.io/github/last-commit/geminishkv/sbom_genform" alt="last commit">
+<img src="https://img.shields.io/github/commit-activity/m/geminishkv/sbom_genform" alt="commit activity">
+<img src="https://img.shields.io/github/issues-pr/geminishkv/sbom_genform" alt="open PRs">
+<img src="https://img.shields.io/github/contributors/geminishkv/sbom_genform" alt="contributors">
 </div>
 
 <div align="center">
 
-[![CI](https://github.com/geminishkv/sbom_genformatter/actions/workflows/ci.yml/badge.svg)](https://github.com/geminishkv/sbom_genformatter/actions/workflows/ci.yml)
+[![CI](https://github.com/geminishkv/sbom_genform/actions/workflows/ci.yml/badge.svg)](https://github.com/geminishkv/sbom_genform/actions/workflows/ci.yml)
 [![Docker Hub](https://img.shields.io/docker/v/geminishkv/sbom-pipeline?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/geminishkv/sbom-pipeline)
 [![PyPI](https://img.shields.io/pypi/v/sbom-pipeline)](https://pypi.org/project/sbom-pipeline/)
 [![Python](https://img.shields.io/pypi/pyversions/sbom-pipeline)](https://pypi.org/project/sbom-pipeline/)
-[![License](https://img.shields.io/github/license/geminishkv/sbom_genformatter)](LICENSE.md)
-[![GitHub Package](https://img.shields.io/badge/GitHub_Packages-sbom--pipeline-8b9aff)](https://github.com/geminishkv/sbom_genformatter/packages)
+[![License](https://img.shields.io/github/license/geminishkv/sbom_genform)](LICENSE.md)
+[![GitHub Package](https://img.shields.io/badge/GitHub_Packages-sbom--pipeline-8b9aff)](https://github.com/geminishkv/sbom_genform/packages)
 
 </div>
 
@@ -68,8 +68,8 @@ pip install sbom-pipeline \
 **Исходники:**
 
 ```bash
-git clone https://github.com/geminishkv/sbom_genformatter.git
-cd sbom_genformatter
+git clone https://github.com/geminishkv/sbom_genform.git
+cd sbom_genform
 python3 -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 ```
@@ -185,7 +185,7 @@ flowchart TD
 ## Структура репозитория
 
 ```text
-sbom_genformatter/
+sbom_genform/
 ├── src/sbom_pipeline/
 │   ├── cli.py            # secsbom / secsbom-pipeline (typer)
 │   ├── pipeline.py       # оркестратор

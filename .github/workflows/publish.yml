@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-packages
-      url: https://github.com/geminishkv/sbom_genformatter/packages
+      url: https://github.com/geminishkv/sbom_genform/packages
     steps:
       - name: Download dist artifacts
         uses: actions/download-artifact@v4
