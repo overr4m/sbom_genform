@@ -1,5 +1,5 @@
 """
-CLI точка входа: sbom / sbom-pipeline
+CLI точка входа: secsbom / secsbom-pipeline
 
 Команды:
   run     — полный пайплайн (генерация → сканирование → отчёты)
@@ -94,10 +94,8 @@ def _main(
         is_eager=True,
     ),
 ) -> None:
-    if ctx.invoked_subcommand is None:
-        _print_banner()
-        _print_help_table()
-        _print_footer()
+    # help (no args / --help / -h) обрабатывается в main() до вызова Click
+    pass
 
 
 def _opt_row(
@@ -207,7 +205,7 @@ def _print_help_table() -> None:
 # run — полный пайплайн
 # ---------------------------------------------------------------------------
 
-@app.command("run")
+@app.command("run", context_settings={"help_option_names": ["-h", "--help"]})
 def cmd_run(
     source: str = typer.Option(
         "local", "--source", "-s",
@@ -294,7 +292,7 @@ def cmd_run(
 # format — форматирование
 # ---------------------------------------------------------------------------
 
-@app.command("format")
+@app.command("format", context_settings={"help_option_names": ["-h", "--help"]})
 def cmd_format(
     sbom_dir: Path = typer.Option(
         Path("secgensbom_out"), "--sbom-dir",
@@ -324,7 +322,7 @@ def cmd_format(
 # verify — проверка подписи
 # ---------------------------------------------------------------------------
 
-@app.command("verify")
+@app.command("verify", context_settings={"help_option_names": ["-h", "--help"]})
 def cmd_verify(
     sbom: Path = typer.Argument(..., help="Путь к SBOM JSON файлу"),
 ) -> None:
@@ -352,7 +350,7 @@ def cmd_verify(
 # info — инспекция SBOM
 # ---------------------------------------------------------------------------
 
-@app.command("info")
+@app.command("info", context_settings={"help_option_names": ["-h", "--help"]})
 def cmd_info(
     sbom: Path = typer.Argument(..., help="Путь к SBOM JSON файлу"),
 ) -> None:
@@ -465,7 +463,7 @@ def cmd_info(
 # status — проверка окружения
 # ---------------------------------------------------------------------------
 
-@app.command("status")
+@app.command("status", context_settings={"help_option_names": ["-h", "--help"]})
 def cmd_status() -> None:
     """Проверка доступности внешних инструментов."""
     _print_banner()
@@ -520,7 +518,7 @@ def cmd_status() -> None:
 # diff — сравнение двух SBOM
 # ---------------------------------------------------------------------------
 
-@app.command("diff")
+@app.command("diff", context_settings={"help_option_names": ["-h", "--help"]})
 def cmd_diff(
     old: Path = typer.Argument(..., help="Старый SBOM JSON"),
     new: Path = typer.Argument(..., help="Новый SBOM JSON"),
@@ -629,6 +627,12 @@ def cmd_diff(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    # Перехватываем secsbom / secsbom --help / secsbom -h до Click
+    if len(sys.argv) == 1 or (len(sys.argv) == 2 and sys.argv[1] in ("--help", "-h")):
+        _print_banner()
+        _print_help_table()
+        _print_footer()
+        sys.exit(0)
     app()
 
 

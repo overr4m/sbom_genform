@@ -79,8 +79,8 @@ Changelog    = "https://github.com/geminishkv/sbom_genformatter/blob/master/CHAN
 # ---------------------------------------------------------------------------
 
 [project.scripts]
-secsbom          = "sbom_pipeline.cli:app"
-secsbom-pipeline = "sbom_pipeline.cli:app"
+secsbom          = "sbom_pipeline.cli:main"
+secsbom-pipeline = "sbom_pipeline.cli:main"
 
 # ---------------------------------------------------------------------------
 # Hatch
