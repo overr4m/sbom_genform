@@ -62,29 +62,42 @@ jobs:
           path: dist/
 
   # ---------------------------------------------------------------------------
-  # 3. Publish → GitHub Packages (PyPI-compatible)
-  #    pip install sbom-pipeline \
-  #      --index-url https://TOKEN@pypi.pkg.github.com/geminishkv/
+  # 3. Publish → GHCR (GitHub Container Registry)
   # ---------------------------------------------------------------------------
-  publish-github-packages:
-    name: Publish → GitHub Packages
+  publish-ghcr:
+    name: Publish → GHCR
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-packages
-      url: https://github.com/geminishkv/sbom_genform/packages
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - name: Download dist artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
+      - uses: actions/checkout@v4
 
-      - name: Publish to GitHub Packages
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          repository-url: https://upload.pkg.github.com/users/${{ github.repository_owner }}/
+          registry: ghcr.io
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract tags/labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.secgensbom
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   # ---------------------------------------------------------------------------
   # 4. Publish → PyPI (API token)
@@ -158,7 +171,7 @@ jobs:
   # ---------------------------------------------------------------------------
   github-release:
     name: GitHub Release
-    needs: [publish-pypi, publish-github-packages, publish-docker]
+    needs: [publish-pypi, publish-ghcr, publish-docker]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
