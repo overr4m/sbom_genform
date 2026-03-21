@@ -83,7 +83,7 @@ jobs:
       - name: Publish to GitHub Packages
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: https://upload.pkg.github.com/organizations/${{ github.repository_owner }}/
+          repository-url: https://upload.pkg.github.com/users/${{ github.repository_owner }}/
           password: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
