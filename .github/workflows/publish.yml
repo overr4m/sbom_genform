@@ -1,0 +1,181 @@
+name: Publish
+
+# Триггер: тег v2.0.0, v2.1.0-rc1 и т.д.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: write   # создание GitHub Release
+  packages: write   # публикация в GitHub Packages
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Validate: lint + tests
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dev deps
+        run: pip install -e ".[dev]"
+
+      - name: ruff check
+        run: ruff check src tests
+
+      - name: pytest
+        run: pytest --tb=short
+
+  # ---------------------------------------------------------------------------
+  # 2. Build wheel + sdist
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build distribution
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build tools
+        run: pip install hatch twine
+
+      - name: Build wheel and sdist
+        run: hatch build
+
+      - name: Verify distributions
+        run: twine check dist/*
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  # ---------------------------------------------------------------------------
+  # 3. Publish → GitHub Packages (PyPI-compatible)
+  #    pip install sbom-pipeline \
+  #      --index-url https://TOKEN@pypi.pkg.github.com/geminishkv/
+  # ---------------------------------------------------------------------------
+  publish-github-packages:
+    name: Publish → GitHub Packages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-packages
+      url: https://github.com/geminishkv/sbom_genformatter/packages
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to GitHub Packages
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://upload.pkg.github.com/organizations/${{ github.repository_owner }}/
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # 4. Publish → PyPI (API token)
+  #    Secret: PYPI_API_TOKEN → Settings → Secrets → Actions
+  # ---------------------------------------------------------------------------
+  publish-pypi:
+    name: Publish → PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # 5. Publish → Docker Hub (amd64 + arm64)
+  #    Secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+  # ---------------------------------------------------------------------------
+  publish-docker:
+    name: Publish → Docker Hub
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract version
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ vars.DOCKERHUB_USERNAME }}/sbom-pipeline" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.secgensbom
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ steps.meta.outputs.version }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # 6. GitHub Release — авто-notes + дистрибутивы во вложениях
+  # ---------------------------------------------------------------------------
+  github-release:
+    name: GitHub Release
+    needs: [publish-pypi, publish-github-packages, publish-docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*

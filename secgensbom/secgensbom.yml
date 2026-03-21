@@ -54,7 +54,7 @@ secgensbom_pipeline:
     - pip install --quiet -e .
   script:
     - |
-      sbom-pipeline run \
+      secsbom-pipeline run \
         --source "${SOURCE:-local}" \
         ${GIT_URL:+--url "$GIT_URL"} \
         ${GIT_TOKEN:+--token "$GIT_TOKEN"} \

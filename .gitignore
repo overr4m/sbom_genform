@@ -52,6 +52,7 @@ secgensbom_out/
 secgensbom_reports/
 reports/
 .dependency-check-data/
+.claude/
 
 # Generated report files (keep examples/ intact)
 *.sig
@@ -75,4 +76,3 @@ reports/
 
 # Node.js
 node_modules/
-.claude/

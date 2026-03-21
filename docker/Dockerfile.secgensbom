@@ -1,7 +1,16 @@
 FROM python:3.12-slim
 
-# --- Системные зависимости + Docker CLI + Trivy + Node.js (cdxgen fallback) ---
-RUN apt-get update && apt-get install -y \
+ARG VERSION=latest
+
+LABEL org.opencontainers.image.title="sbom-pipeline" \
+      org.opencontainers.image.description="SBOM Generator & Formatter — CycloneDX 1.5, Trivy, OWASP Dependency-Check" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.source="https://github.com/geminishkv/sbom_genformatter" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.authors="Elijah S Shmakov"
+
+# --- Системные зависимости + Docker CLI ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl gnupg git jq \
  && mkdir -p /etc/apt/keyrings \
  && curl -fsSL https://download.docker.com/linux/debian/gpg \
@@ -10,38 +19,38 @@ RUN apt-get update && apt-get install -y \
     https://download.docker.com/linux/debian \
     $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
     > /etc/apt/sources.list.d/docker.list \
- && apt-get update && apt-get install -y docker-ce-cli \
+ && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli \
  && rm -rf /var/lib/apt/lists/*
 
-# Trivy
+# --- Trivy ---
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
     | sh -s -- -b /usr/local/bin
 
-# Node.js LTS + npx (cdxgen для non-Python проектов)
+# --- Node.js LTS + npx (cdxgen для non-Python проектов) ---
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
- && apt-get install -y nodejs \
+ && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
-# --- Python-пакет sbom-pipeline ---
+# --- Python-пакет sbom-pipeline (слои кешируются отдельно) ---
 WORKDIR /app
 COPY pyproject.toml ./
-COPY src/ ./src/
-
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -e .
+ && pip install --no-cache-dir -e . --no-build-isolation || true
+
+COPY src/ ./src/
+RUN pip install --no-cache-dir -e .
+
+# --- Демо-проект (монтируй свой через -v /path:/app/project_inject) ---
+COPY examples/project_inject ./examples/project_inject
 
 # --- Переменные по умолчанию ---
 ENV PYTHONUNBUFFERED=1 \
-    REPO_ROOT=/app \
-    PROJECT_DIR=/app/project_inject \
+    PROJECT_DIR=/app/examples/project_inject \
     OUTPUT_DIR=/app/secgensbom_out \
     REPORTS_DIR=/app/secgensbom_reports \
     SOURCE=local \
     SKIP_CLAIR=true
-# Примечание: монтируй свой проект в /app/project_inject через -v.
-# Демо-проект доступен внутри образа в /app/examples/project_inject.
 
-# --- Монтируемые директории ---
 VOLUME ["/app/project_inject", "/app/secgensbom_out", "/app/secgensbom_reports"]
 
 ENTRYPOINT ["sbom-pipeline"]
