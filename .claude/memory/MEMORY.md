@@ -68,6 +68,11 @@ Tools:
 ## Known Bugs
 See `.claude/memory/bugs.md`
 
+## Ветки репозитория
+See `.claude/memory/project_branches.md`
+
+`secgensbom.yml` — только для ветки `securitycheck`, не трогать триггеры.
+
 ---
 
 ## Стандарты для всех проектов пользователя
