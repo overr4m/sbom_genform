@@ -201,7 +201,7 @@ sbom_genform/
 │       └── clair.py
 ├── docker/
 │   └── Dockerfile.secgensbom
-├── examples/project_inject/   # уязвимый PHP-демо-проект
+├── examples/project_inject/   # уязвимый PHP проект
 ├── secgensbom/secgensbom.yml  # GitLab CI shared template
 ├── .github/workflows/
 │   ├── ci.yml
