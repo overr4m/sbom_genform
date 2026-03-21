@@ -67,3 +67,19 @@ Tools:
 
 ## Known Bugs
 See `.claude/memory/bugs.md`
+
+---
+
+## Стандарты для всех проектов пользователя
+
+### README Standard
+
+See `.claude/memory/readme_standard.md`
+
+Шаблон README.md отработан на `sbom_genformatter`. Применять ко всем AppSec/DevSecOps репозиториям.
+
+### CLI Standard
+
+See `.claude/memory/cli_standard.md`
+
+CLI-паттерн (typer + rich) отработан на `sbom_genformatter/src/sbom_pipeline/cli.py`. Переиспользовать в новых инструментах.
