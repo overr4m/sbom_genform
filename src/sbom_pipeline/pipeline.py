@@ -94,7 +94,7 @@ def run(cfg: PipelineConfig) -> None:
     all_findings += depcheck.scan(
         project_dir=cfg.project_dir,
         output_dir=cfg.depcheck_dir,
-        data_dir=cfg.dep_check_data,
+        data_dir=cfg.dep_check_data or Path(".dependency-check-data"),
         host_project_dir=cfg.host_project_dir,
         host_output_dir=cfg.host_dep_report_dir,
     )

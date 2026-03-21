@@ -121,9 +121,10 @@ class Dependency:
                 or soup.find(attrs={"data-track": "outbound-project-url"})
             )
             if link and link.get("href") and "github.com" in link["href"]:
-                langs = self._fetch_github_langs(clean_git_url(link["href"]))
+                href = str(link["href"])
+                langs = self._fetch_github_langs(clean_git_url(href))
                 self.srcLangs = langs or ["NUGET check manually"]
-                self.source = link["href"]
+                self.source = href
             else:
                 self.srcLangs, self.source = ["NUGET check manually"], pkg_url
         except Exception as e:
