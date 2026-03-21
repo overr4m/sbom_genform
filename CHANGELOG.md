@@ -1,52 +1,70 @@
-# Changelog
+# История изменений
 
-All notable changes to **sbom-pipeline** are documented here.
-Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
----
-
-## [Unreleased]
+Все значимые изменения **sbom-pipeline** документируются здесь.
+Формат: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Версионирование: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [2.0.0] — 2026-03-21
+## [2.1.0] — 2026-03-21
 
-### Added
-- Pure Python pipeline — no shell scripts anywhere
-- `sbom-pipeline run` / `sbom` CLI (typer + rich) with subcommands `run`, `format`, `verify`
-- `--version` / `-V` flag on the root command
-- Short entry-point alias `sbom` alongside `sbom-pipeline`
-- SBOM generation from local directory, GitHub, or GitLab via GitPython
-- Auto-detection of project type (Python → cyclonedx-py, others → cdxgen fallback)
-- Pure-Python deduplication by PURL key (`dedup.py`)
-- SHA-256 signing embedded in `metadata.signature` + `.sig` sidecar file (`sign.py`)
-- Vulnerability scanning: Trivy (fs + sbom), OWASP Dependency-Check, Clair (optional)
-- `VulnFinding` dataclass — normalised vulnerability model across all scanners
-- Vulnerability injection into CycloneDX `vulnerabilities[]` array (`vuln_merger.py`)
-- Human-readable reports: Excel (.xlsx, 2 sheets), Word (.docx), ODT (.odt)
-- Component-to-vulnerability mapping in all report formats
-- `pyproject.toml` single-file packaging with `hatchling`
-- GitHub Actions CI workflow (lint + test matrix 3.11–3.13)
-- GitHub Actions publish workflow with PyPI Trusted Publishing (OIDC)
-- GitLab CI include template (`secgensbom/secgensbom.yml`)
-- Docker images: `docker/Dockerfile.secgensbom`, `docker/Dockerfile.formatter`
-- Vulnerable PHP demo project moved to `examples/project_inject/`
+### Добавлено
 
-### Removed
-- All shell scripts (`pipeline.sh`, `scan_trivy.sh`, `scan_clair.sh`, etc.)
-- Legacy `script/` Python package
-- Submodule references (`.gitmodules`)
+- Команды CLI: `secsbom` / `secsbom-pipeline` (переименованы из `sbom` / `sbom-pipeline`)
+- Кастомный help с баннером и панелями: `secsbom`, `secsbom -h`, `secsbom --help`
+- Подкоманды: `info` (инспекция SBOM), `status` (проверка окружения), `diff` (сравнение SBOM)
+- Мультиплатформенный Docker-образ (linux/amd64 + linux/arm64) на Docker Hub
+- Единый workflow `publish.yml` — один тег публикует PyPI + GitHub Packages + Docker Hub + Release
+- Диаграммы архитектуры Mermaid в README
 
-### Changed
-- Default `project_dir` changed from `project_inject/` to `examples/project_inject/`
-- Docker entrypoints now call `sbom-pipeline` CLI directly
+### Изменено
+
+- Точки входа переименованы: `secsbom = "sbom_pipeline.cli:main"`
+- Публикация на PyPI: OIDC → API-токен (`PYPI_API_TOKEN`)
+- `secgensbom.yml` упрощён до одного задания
+- Все ссылки в репозитории: `sbom_genformatter` → `sbom_genform`
+
+### Удалено
+
+- `docker-publish.yml` (объединён в `publish.yml`)
+- Шаг сборки Docker из `secgensbom.yml`
 
 ---
 
-## [1.x] — legacy
+## [2.0.0] — 2025-12-01
 
-Shell-script-based pipeline. See git history for details.
+### Добавлено
 
-[Unreleased]: https://github.com/geminishkv/sbom_genform/compare/v2.0.0...HEAD
+- Полный Python-пайплайн без shell-скриптов
+- CLI `secsbom-pipeline run` на typer + rich: команды `run`, `format`, `verify`
+- Генерация SBOM из локальной директории, GitHub и GitLab
+- Автоопределение типа проекта (Python → cyclonedx-py, остальные → cdxgen)
+- Дедупликация по PURL (`dedup.py`)
+- SHA-256 подпись в `metadata.signature` + `.sig` (`sign.py`)
+- Сканирование уязвимостей: Trivy, OWASP Dependency-Check, Clair (опционально)
+- Встраивание уязвимостей в CycloneDX `vulnerabilities[]` (`vuln_merger.py`)
+- Отчёты: Excel (.xlsx, 2 листа), Word (.docx), ODT (.odt)
+- CI GitHub Actions: lint + тесты (Python 3.11–3.13)
+- Shared-шаблон GitLab CI (`secgensbom/secgensbom.yml`)
+- Docker-образы в `docker/`
+- Уязвимый PHP демо-проект в `examples/project_inject/`
+
+### Удалено
+
+- Shell-скрипты (`pipeline.sh`, `scan_trivy.sh`, `scan_clair.sh` и др.)
+- Пакет `script/`
+- Сабмодули (`.gitmodules`)
+
+### Изменено
+
+- Путь по умолчанию: `project_inject/` → `examples/project_inject/`
+
+---
+
+## [1.x] — устаревшая версия
+
+Пайплайн на shell-скриптах. История в git log.
+
+[Unreleased]: https://github.com/geminishkv/sbom_genform/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/geminishkv/sbom_genform/releases/tag/v2.1.0
 [2.0.0]: https://github.com/geminishkv/sbom_genform/releases/tag/v2.0.0
