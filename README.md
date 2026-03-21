@@ -18,7 +18,7 @@
 <div align="center">
 
 [![CI](https://github.com/geminishkv/sbom_genform/actions/workflows/ci.yml/badge.svg)](https://github.com/geminishkv/sbom_genform/actions/workflows/ci.yml)
-[![Docker Hub](https://img.shields.io/docker/v/geminishkv/sbom-pipeline?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/geminishkv/sbom-pipeline)
+[![Docker Hub](https://img.shields.io/docker/v/geminishkvdev/sbom-pipeline?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/geminishkvdev/sbom-pipeline)
 [![PyPI](https://img.shields.io/pypi/v/sbom-pipeline)](https://pypi.org/project/sbom-pipeline/)
 [![Python](https://img.shields.io/pypi/pyversions/sbom-pipeline)](https://pypi.org/project/sbom-pipeline/)
 [![License](https://img.shields.io/github/license/geminishkv/sbom_genform)](LICENSE.md)
