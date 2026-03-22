@@ -33,6 +33,7 @@
 - Генерирует SBOM из локальной директории или Git-репозитория (GitHub / GitLab)
 - Сканирует уязвимости через **Trivy**, **OWASP Dependency-Check**, **Clair**
 - Встраивает найденные уязвимости в SBOM (CycloneDX 1.5)
+- Опционально обогащает уязвимости идентификаторами **БДУ ФСТЭК**
 - Экспортирует читаемые отчёты: **Excel (.xlsx)**, **Word (.docx)**, **ODT (.odt)**
 - Подписывает итоговый SBOM (SHA-256)
 
@@ -88,6 +89,8 @@ pip install -e ".[dev]"
 | `secgensbom_out/merged-bom-signed.sig`  | SHA-256 контрольная сумма       |
 | `secgensbom_out/vulns-normalized.json`  | Нормализованные уязвимости      |
 
+Если включено BDU-обогащение, в `merged-bom-signed.json` идентификатор БДУ записывается в `vulnerabilities[].properties[]` как свойство с именем `ru.fstec.bdu:id`.
+
 ### Отчёты сканеров
 
 | Путь | Сканер |
@@ -104,6 +107,47 @@ pip install -e ".[dev]"
 | `secgensbom_reports/excel/*.xlsx` | Excel  | Лист 1: компоненты, Лист 2: уязвимости    |
 | `secgensbom_reports/docx/*.docx`  | Word   | Таблица компонентов + таблица уязвимостей |
 | `secgensbom_reports/odt/*.odt`    | ODT    | То же самое                               |
+
+Если пайплайн запущен с `--bdu` или `BDU=true`, во всех форматах отчётов уязвимостей появляется отдельная колонка `BDU / ID`. Если BDU-обогащение выключено, эта колонка не выводится.
+
+---
+
+## BDU Enrichment
+
+Обогащение идентификаторами БДУ ФСТЭК выключено по умолчанию.
+
+Включение через CLI:
+
+```bash
+secsbom run --bdu
+```
+
+Включение через переменную окружения:
+
+```bash
+export BDU=true
+secsbom run
+```
+
+При включённом BDU пайплайн:
+
+- запрашивает соответствия `CVE -> BDU ID` через `bdu.fstec.ru`
+- добавляет BDU ID в итоговый CycloneDX SBOM как свойство уязвимости
+- выводит BDU ID в экспортируемые отчёты
+
+Пример фрагмента SBOM:
+
+```json
+{
+  "id": "CVE-2023-1234",
+  "properties": [
+    {
+      "name": "ru.fstec.bdu:id",
+      "value": "BDU:2023-01813"
+    }
+  ]
+}
+```
 
 ---
 

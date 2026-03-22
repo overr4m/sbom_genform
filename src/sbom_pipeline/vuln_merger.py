@@ -5,9 +5,11 @@ from __future__ import annotations
 import copy
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+from sbom_pipeline.enrichters import bdu
 
 
 @dataclass
@@ -23,6 +25,7 @@ class VulnFinding:
     description: str
     scanner: str           # trivy | clair | dependency-check
     fixed_version: str = ""
+    bdu_id: Optional[str] = None  # Внутренний ID от BDU, если есть
 
     @property
     def severity_upper(self) -> str:
@@ -32,6 +35,7 @@ class VulnFinding:
 def merge_vulns_into_sbom(
     sbom: Dict[str, Any],
     findings: List[VulnFinding],
+    enable_bdu: bool = False,
 ) -> Dict[str, Any]:
     """
     Встроить список VulnFinding в SBOM как массив «vulnerabilities»
@@ -53,6 +57,11 @@ def merge_vulns_into_sbom(
             comp_index[purl] = bom_ref
         comp_index[f"{name}@{version}"] = bom_ref
 
+    bdu_by_cve_index: Dict[str, str] = {}
+    if enable_bdu:
+        findings_list: list[str] = [f.cve_id for f in findings]
+        bdu_by_cve_index = bdu.get_bdu_ids_by_cves(findings_list)
+
     vulns: list[Dict[str, Any]] = []
     for f in findings:
         ref = (
@@ -60,6 +69,9 @@ def merge_vulns_into_sbom(
             or comp_index.get(f"{f.component_name}@{f.component_version}")
             or f"{f.component_name}@{f.component_version}"
         )
+
+        if enable_bdu and bdu_by_cve_index:
+            f.bdu_id = bdu_by_cve_index.get(f.cve_id)
 
         entry: Dict[str, Any] = {
             "id": f.cve_id,
@@ -74,6 +86,13 @@ def merge_vulns_into_sbom(
             "description": f.description,
             "affects": [{"ref": ref}],
         }
+        if f.bdu_id:
+            entry["properties"] = [
+                {
+                    "name": "ru.fstec.bdu:id",
+                    "value": f.bdu_id,
+                }
+            ]
         if f.fixed_version:
             entry["recommendation"] = f"Обновить до версии {f.fixed_version}"
 
@@ -90,6 +109,7 @@ def save_vuln_report(findings: List[VulnFinding], path: Path) -> None:
     data = [
         {
             "cve_id": f.cve_id,
+            "bdu_id": f.bdu_id,
             "component": f.component_name,
             "version": f.component_version,
             "purl": f.component_purl,

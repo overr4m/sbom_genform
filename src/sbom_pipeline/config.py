@@ -50,6 +50,9 @@ class PipelineConfig:
     # --- GitHub API ---
     github_token: Optional[str] = None
 
+    # --- Enrichment ---
+    use_bdu: bool = False
+
     # --- Производные пути (вычисляются после init) ---
     trivy_dir: Path = field(init=False)
     clair_dir: Path = field(init=False)
@@ -88,6 +91,7 @@ class PipelineConfig:
             clair_endpoint=os.getenv("CLAIR_ENDPOINT", "http://clair:8080"),
             skip_clair=os.getenv("SKIP_CLAIR", "true").lower() in ("true", "1", "yes"),
             github_token=os.getenv("GITHUB_TOKEN") or None,
+            use_bdu=os.getenv("BDU", "false").lower() in ("true", "1", "yes"),
         )
 
     def ensure_output_dirs(self) -> None:

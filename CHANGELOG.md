@@ -6,6 +6,17 @@
 
 ---
 
+## [Unreleased]
+
+### Добавлено
+
+- Опциональное BDU-обогащение уязвимостей через `--bdu` и переменную окружения `BDU`
+- Выгрузка `BDU / ID` в Excel, Word и ODT отчёты
+
+### Изменено
+
+- BDU ID в CycloneDX SBOM теперь сохраняется в `vulnerabilities[].properties[]` как `ru.fstec.bdu:id`
+
 ## [2.1.0] — 2026-03-21
 
 ### Добавлено

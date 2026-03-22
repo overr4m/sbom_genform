@@ -44,6 +44,8 @@ _VULN_COLUMNS = [
     "Сканер",
     "Исправлено в версии",
 ]
+_BDU_VULN_COLUMN = "BDU / ID"
+_SEVERITY_COLUMN = "Критичность"
 
 # Цвета критичности для Word
 _SEVERITY_COLORS: Dict[str, RGBColor] = {
@@ -61,10 +63,12 @@ class Exporter:
         dependencies: list,
         vulns: Optional[List[VulnFinding]] = None,
         sbom_path: Optional[str] = None,
+        include_bdu: bool = False,
     ) -> None:
         self.deps = dependencies
         self.vulns: List[VulnFinding] = vulns or []
         self.sbom_path = sbom_path
+        self.include_bdu = include_bdu
         logging.info(
             f"Exporter: {len(self.deps)} зависимостей, {len(self.vulns)} уязвимостей"
         )
@@ -77,13 +81,14 @@ class Exporter:
         path = Path(report)
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
+            vuln_columns = self._vuln_columns()
             with pd.ExcelWriter(str(path), engine="openpyxl") as writer:
                 # Лист 1: Компоненты
                 comp_df = pd.DataFrame(self._comp_rows(), columns=_COMP_COLUMNS)
                 comp_df.to_excel(writer, index=False, sheet_name="Компоненты")
 
                 # Лист 2: Уязвимости
-                vuln_df = pd.DataFrame(self._vuln_rows(), columns=_VULN_COLUMNS)
+                vuln_df = pd.DataFrame(self._vuln_rows(), columns=vuln_columns)
                 vuln_df.to_excel(writer, index=False, sheet_name="Уязвимости")
 
             self._write_sig(path)
@@ -122,10 +127,11 @@ class Exporter:
             # --- Таблица уязвимостей ---
             if self.vulns:
                 doc.add_heading("Уязвимости", level=2)
+                vuln_columns = self._vuln_columns()
                 vuln_rows = self._vuln_rows()
-                vt = doc.add_table(rows=1 + len(vuln_rows), cols=len(_VULN_COLUMNS))
+                vt = doc.add_table(rows=1 + len(vuln_rows), cols=len(vuln_columns))
                 vt.style = "Table Grid"
-                for i, col in enumerate(_VULN_COLUMNS):
+                for i, col in enumerate(vuln_columns):
                     cell = vt.rows[0].cells[i]
                     cell.text = col
                     for run in cell.paragraphs[0].runs:
@@ -136,7 +142,7 @@ class Exporter:
                         cell = vt.rows[r_idx].cells[c_idx]
                         cell.text = str(val)
                         # Подсветка критичности
-                        if c_idx == 4:  # Критичность
+                        if vuln_columns[c_idx] == _SEVERITY_COLUMN:
                             color = _SEVERITY_COLORS.get(str(val).upper(), _SEVERITY_COLORS["UNKNOWN"])
                             for run in cell.paragraphs[0].runs:
                                 run.font.color.rgb = color
@@ -174,7 +180,14 @@ class Exporter:
             # --- Таблица уязвимостей ---
             if self.vulns:
                 doc.text.addElement(P(text="Уязвимости", stylename=title_style))
-                doc.text.addElement(self._make_odt_table("SBOM_Vulns", _VULN_COLUMNS, self._vuln_rows(), cell_style))
+                doc.text.addElement(
+                    self._make_odt_table(
+                        "SBOM_Vulns",
+                        self._vuln_columns(),
+                        self._vuln_rows(),
+                        cell_style,
+                    )
+                )
 
             doc.save(str(path))
             self._write_sig(path)
@@ -203,9 +216,16 @@ class Exporter:
             })
         return rows
 
+    def _vuln_columns(self) -> List[str]:
+        columns = list(_VULN_COLUMNS)
+        if self.include_bdu:
+            columns.insert(3, _BDU_VULN_COLUMN)
+        return columns
+
     def _vuln_rows(self) -> List[Dict[str, Any]]:
-        return [
-            {
+        rows: List[Dict[str, Any]] = []
+        for v in self.vulns:
+            row: Dict[str, Any] = {
                 _VULN_COLUMNS[0]: v.component_name,
                 _VULN_COLUMNS[1]: v.component_version,
                 _VULN_COLUMNS[2]: v.cve_id,
@@ -215,8 +235,12 @@ class Exporter:
                 _VULN_COLUMNS[6]: v.scanner,
                 _VULN_COLUMNS[7]: v.fixed_version,
             }
-            for v in self.vulns
-        ]
+            if self.include_bdu:
+                items = list(row.items())
+                items.insert(3, (_BDU_VULN_COLUMN, v.bdu_id or ""))
+                row = dict(items)
+            rows.append(row)
+        return rows
 
     @staticmethod
     def _make_odt_table(
