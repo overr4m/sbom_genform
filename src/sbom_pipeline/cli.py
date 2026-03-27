@@ -666,8 +666,8 @@ def add_gost_cert_fields(sbom_path: Path, add_cert: bool = False) -> Path:
 
 @app.command("cert", context_settings={"help_option_names": ["-h", "--help"]})
 def cmd_cert(
-    sbom: Path = typer.Argument(..., help="Путь к SBOM JSON файлу"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Выходной файл (по умолчанию: input-cert.json)")
+    sbom: Path = typer.Argument(None, help="Путь к SBOM JSON файлу"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Выходной файл (по умолчанию: PATH(cert).json)")
 ) -> None:
     """Добавление полей GOST:attack_surface, GOST:security_function во все компоненты (по умолчанию: value = "no")."""
     _print_banner()
