@@ -4,6 +4,8 @@ import logging
 import os
 from urllib.parse import urlparse, urlunparse
 
+from .constants import SOURCE_TYPE_GITLAB, SOURCE_TYPE_GITHUB
+
 
 def clean_git_url(url: str) -> str:
     """Нормализовать git URL для запросов к API."""
@@ -67,3 +69,13 @@ def setup_logging(verbose: bool = False, log_file: str = "sbom_pipeline.log") ->
     except OSError:
         pass
     logging.basicConfig(format=fmt, level=level, handlers=handlers, force=True)
+
+def detect_git_service(url: str) -> str | None:
+    domain = urlparse(url).netloc.lower()
+
+    if "gitlab" in domain:
+        return SOURCE_TYPE_GITLAB
+    elif "github" in domain:
+        return SOURCE_TYPE_GITHUB
+    else:
+        return None

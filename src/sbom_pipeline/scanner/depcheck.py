@@ -18,8 +18,8 @@ def scan(
     data_dir: Path,
     host_project_dir: Optional[Path] = None,
     host_output_dir: Optional[Path] = None,
-    host_data_dir: Optional[Path] = None,
     nvd_api_key: Optional[str] = None,
+    host_data_dir: Optional[Path] = None,
 ) -> List[VulnFinding]:
     """
     Запустить OWASP dependency-check через Docker.
@@ -46,6 +46,7 @@ def scan(
         "--format", "ALL",
         "--out", "/report",
         "--nvdValidForHours", "168",
+        "--nvdApiKey", nvd_api_key,
     ]
     if nvd_api_key:
         cmd += ["--nvdApiKey", nvd_api_key]
