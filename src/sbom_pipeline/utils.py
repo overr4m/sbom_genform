@@ -70,12 +70,12 @@ def setup_logging(verbose: bool = False, log_file: str = "sbom_pipeline.log") ->
         pass
     logging.basicConfig(format=fmt, level=level, handlers=handlers, force=True)
 
-def detect_git_service(url: str) -> str | None:
+def detect_git_service(url: str) -> str :
     domain = urlparse(url).netloc.lower()
 
     if "gitlab" in domain:
         return SOURCE_TYPE_GITLAB
     elif "github" in domain:
         return SOURCE_TYPE_GITHUB
-    else:
-        return None
+
+    raise Exception("Unexpted git service, gitlab or github available")
