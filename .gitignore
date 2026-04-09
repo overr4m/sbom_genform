@@ -52,7 +52,6 @@ secgensbom_out/
 secgensbom_reports/
 reports/
 .dependency-check-data/
-.claude/
 
 # Generated report files (keep examples/ intact)
 *.sig
@@ -73,6 +72,9 @@ reports/
 *.gz
 *.7z
 *.rar
+
+# Claude Code
+.claude/
 
 # Node.js
 node_modules/
