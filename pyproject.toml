@@ -138,3 +138,6 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts   = "-v --tb=short"
+markers = [
+    "integration: real integration tests with external services",
+]

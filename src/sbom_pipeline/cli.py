@@ -153,17 +153,18 @@ def _print_help_table() -> None:
 
     # ── run options ───────────────────────────────────────────────────────────
     rt = _opts_table()
-    _opt_row(rt, "--source",          "-s", "TEXT", "Источник: local | github | gitlab",   "SOURCE",         "local")
-    _opt_row(rt, "--path",            "",   "PATH", "Путь к локальному проекту",           "PROJECT_DIR",    "examples/project_inject")
-    _opt_row(rt, "--url",             "",   "TEXT", "URL репозитория GitHub/GitLab",       "GIT_URL",        "")
-    _opt_row(rt, "--token",           "",   "TEXT", "Токен доступа (ghp_... / glpat-...)", "GIT_TOKEN",      "")
-    _opt_row(rt, "--branch",          "",   "TEXT", "Ветка репозитория",                   "GIT_BRANCH",     "HEAD")
-    _opt_row(rt, "--output-dir",      "-o", "PATH", "Директория артефактов SBOM",          "OUTPUT_DIR",     "secgensbom_out")
-    _opt_row(rt, "--reports-dir",     "",   "PATH", "Директория отчётов",                  "REPORTS_DIR",    "secgensbom_reports")
-    _opt_row(rt, "--image",           "",   "TEXT", "Docker-образ для сканирования Clair", "IMAGE_NAME",     "")
-    _opt_row(rt, "--clair-endpoint",  "",   "TEXT", "Endpoint Clair-сервера",              "CLAIR_ENDPOINT", "http://clair:8080")
-    _opt_row(rt, "--no-clair/--clair","",   "",     "Пропустить шаг Clair",               "",               "no-clair")
-    _opt_row(rt, "--verbose",         "-v", "",     "Подробный вывод (DEBUG-лог)",         "",               "false")
+    _opt_row(rt, "--source",          "-s", "TEXT", "Источник: local | github | gitlab",         "SOURCE",         "local")
+    _opt_row(rt, "--path",            "",   "PATH", "Путь к локальному проекту",                 "PROJECT_DIR",    "examples/project_inject")
+    _opt_row(rt, "--url",             "",   "TEXT", "URL репозитория GitHub/GitLab",             "GIT_URL",        "")
+    _opt_row(rt, "--token",           "",   "TEXT", "Токен доступа (ghp_... / glpat-...)",       "GIT_TOKEN",      "")
+    _opt_row(rt, "--branch",          "",   "TEXT", "Ветка репозитория",                         "GIT_BRANCH",     "HEAD")
+    _opt_row(rt, "--output-dir",      "-o", "PATH", "Директория артефактов SBOM",                "OUTPUT_DIR",     "secgensbom_out")
+    _opt_row(rt, "--reports-dir",     "",   "PATH", "Директория отчётов",                        "REPORTS_DIR",    "secgensbom_reports")
+    _opt_row(rt, "--image",           "",   "TEXT", "Docker-образ для сканирования Clair",       "IMAGE_NAME",     "")
+    _opt_row(rt, "--clair-endpoint",  "",   "TEXT", "Endpoint Clair-сервера",                    "CLAIR_ENDPOINT", "http://clair:8080")
+    _opt_row(rt, "--no-clair/--clair","",   "",     "Пропустить шаг Clair",                      "",               "no-clair")
+    _opt_row(rt, "--bdu/--no-bdu",    "",   "",     "Обогащать уязвимости идентификаторами БДУ", "BDU",            "no-bdu")
+    _opt_row(rt, "--verbose",         "-v", "",     "Подробный вывод (DEBUG-лог)",               "",               "false")
 
     examples = Table(box=None, show_header=False, padding=(0, 2), show_edge=False)
     examples.add_column()
@@ -255,6 +256,11 @@ def cmd_run(
         True, "--no-clair/--clair",
         help="Пропустить шаг Clair (по умолчанию: пропускать)",
     ),
+    use_bdu: bool = typer.Option(
+        False, "--bdu/--no-bdu",
+        help="Обогащать уязвимости идентификаторами БДУ (по умолчанию: выключено)",
+        envvar="BDU",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробный вывод"),
 ) -> None:
     """Полный пайплайн: генерация SBOM → сканирование → отчёты."""
@@ -276,6 +282,7 @@ def cmd_run(
     cfg.image_name = image_name or cfg.image_name
     cfg.clair_endpoint = clair_endpoint
     cfg.skip_clair = no_clair
+    cfg.use_bdu = use_bdu
     cfg.__post_init__()
 
     try:

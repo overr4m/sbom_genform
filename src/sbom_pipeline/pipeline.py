@@ -115,7 +115,11 @@ def run(cfg: PipelineConfig) -> None:
         sbom_data: Dict[str, Any] = json.load(f)
 
     if all_findings:
-        sbom_data = merge_vulns_into_sbom(sbom_data, all_findings)
+        sbom_data = merge_vulns_into_sbom(
+            sbom_data,
+            all_findings,
+            enable_bdu=cfg.use_bdu,
+        )
         SbomHandler.write_json(sbom_data, signed_bom)
 
         # Сохранить нормализованный vuln-dump
@@ -171,7 +175,12 @@ def _export_reports(
         d.mkdir(parents=True, exist_ok=True)
 
     deps = _extract_dependencies(sbom_data, str(cfg.output_dir / SIGNED_BOM_FILE))
-    exporter = Exporter(deps, vulns=vulns, sbom_path=str(cfg.output_dir / SIGNED_BOM_FILE))
+    exporter = Exporter(
+        deps,
+        vulns=vulns,
+        sbom_path=str(cfg.output_dir / SIGNED_BOM_FILE),
+        include_bdu=cfg.use_bdu,
+    )
 
     exporter.exportToExcel(str(excel_dir / f"{stem}{EXCEL_EXTENSION}"))
     exporter.exportToDocx(str(docx_dir / f"{stem}{DOCX_EXTENSION}"))
