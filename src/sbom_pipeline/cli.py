@@ -149,6 +149,7 @@ def _print_help_table() -> None:
     cmd_t.add_row("[bold green]info[/bold green]",   "Инспекция SBOM: компоненты, CVE по severity, подпись  [dim]<файл>[/dim]")
     cmd_t.add_row("[bold green]status[/bold green]", "Проверка окружения: Trivy / Docker / Node.js / Python")
     cmd_t.add_row("[bold green]diff[/bold green]",   "Сравнение двух SBOM: добавленные компоненты, новые CVE  [dim]<старый> <новый>[/dim]")
+    cmd_t.add_row("[bold green]cert[/bold green]",   "Обогащение SBOM файла полями GOST:attack_surface, GOST:security_function  [dim]<файл>[/dim]")
     console.print(Panel(cmd_t, border_style="bright_black", padding=(0, 1)))
 
     # ── run options ───────────────────────────────────────────────────────────
@@ -628,6 +629,70 @@ def cmd_diff(
 
     _print_footer()
 
+# ---------------------------------------------------------------------------
+# cert — обогащение полями
+# ---------------------------------------------------------------------------
+def add_gost_cert_fields(sbom_path: Path, add_cert: bool = False) -> Path:
+    """Добавить GOST поля в каждый компонент."""
+    if not add_cert:
+        return sbom_path
+    
+    import json
+    import logging
+    
+    with open(sbom_path, 'r', encoding='utf-8') as f:
+        sbom = json.load(f)
+    
+    components = sbom.get("components", [])
+    if not components:
+        return sbom_path
+    
+    gost_properties =[
+        {"name": "GOST:attack_surface", "value": "no"},
+        {"name": "GOST:security_function", "value": "no"}
+    ]
+    
+    updated = 0
+    for component in components:
+        props = component.get("properties", [])
+        component["properties"] = props + gost_properties
+        updated += 1
+    
+    cert_path = Path(str(sbom_path).replace('.json', '(cert).json'))
+    cert_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(cert_path, 'w', encoding='utf-8') as f:
+        json.dump(sbom, f, indent=2, ensure_ascii=False)
+    
+    last_digit = updated % 10
+    if updated > 20 and last_digit in (2, 3, 4):
+        logging.info(f"GOST поля добавлены в {updated} компонента → {cert_path}")
+    else:
+        logging.info(f"GOST поля добавлены в {updated} компонентов → {cert_path}")
+    return cert_path
+
+@app.command("cert", context_settings={"help_option_names": ["-h", "--help"]})
+def cmd_cert(
+    sbom: Path = typer.Argument(None, help="Путь к SBOM JSON файлу"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Выходной файл (по умолчанию: PATH(cert).json)")
+) -> None:
+    """Добавление полей GOST:attack_surface, GOST:security_function во все компоненты (по умолчанию: value = "no")."""
+    _print_banner()
+    setup_logging()
+    
+    if not sbom.exists():
+        console.print(f"[bold red]✗ SBOM файл не найден:[/bold red] {sbom}")
+        raise typer.Exit(code=1)
+    
+    try:
+        cert_sbom = add_gost_cert_fields(sbom, add_cert=True)
+    except Exception as e:
+        console.print(f"[bold red]✗ Ошибка добавления полей:[/bold red] {e}")
+        raise typer.Exit(code=1)
+    
+    output_path = output or cert_sbom  # Используем путь из utils если --output не указан
+    console.print(f"[bold green]✓ Поля успешно добавлены в properties:[/bold green] {output_path}")
+    _print_footer()
 
 # ---------------------------------------------------------------------------
 # Точка входа

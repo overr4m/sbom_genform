@@ -41,7 +41,7 @@
 
 ## Main CLI
 
-![mainhelp](assets/helpmain.png)
+![mainhelp](assets/help_main.jpg)
 
 ***
 
@@ -86,6 +86,7 @@ pip install -e ".[dev]"
 | `secgensbom_out/app-bom-cdxgen.json`    | Исходный SBOM                   |
 | `secgensbom_out/app-bom-dedup.json`     | После дедупликации              |
 | `secgensbom_out/merged-bom-signed.json` | Подписанный SBOM с уязвимостями |
+| `secgensbom_out/report_name(cert)`      | Отчет с добавлением полей GOST  |
 | `secgensbom_out/merged-bom-signed.sig`  | SHA-256 контрольная сумма       |
 | `secgensbom_out/vulns-normalized.json`  | Нормализованные уязвимости      |
 
