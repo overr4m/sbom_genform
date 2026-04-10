@@ -155,9 +155,10 @@ secsbom run
 ## Docker
 
 Образ включает Python, Trivy, Docker CLI и Node.js/npx (cdxgen для non-Python проектов).
-OWASP Dependency-Check запускается отдельно — его Java-зависимость утяжелила бы образ на ~400 МБ.
+OWASP Dependency-Check запускается внутри утилиты через `docker run` (Docker-in-Docker), его Java-зависимость утяжелила бы основной образ на ~400 МБ.
+Clair требует отдельного работающего HTTP-сервера — поэтому он вынесен в `docker-compose.yml`.
 
-### Docker Hub
+### Docker Hub (только Trivy, без Clair/Dependency-Check)
 
 ```bash
 docker pull geminishkv/sbom-pipeline:latest
@@ -169,6 +170,38 @@ docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
   geminishkv/sbom-pipeline:latest
 ```
+
+### Docker Compose (Trivy + Dependency-Check + Clair)
+
+Полный стек с OWASP Dependency-Check и Clair v4 запускается через `docker-compose.yml`:
+
+```bash
+docker compose up --build
+```
+
+**Порядок запуска:**
+1. `clair-db` (Postgres) — база данных Clair, ожидает healthcheck
+2. `clair` — HTTP-сервер уязвимостей Clair v4, ожидает готовности БД
+3. `secgensbom` — основной пайплайн, стартует после того, как Clair пройдёт healthcheck
+
+**Что происходит внутри `secgensbom`:**
+- Trivy запускается напрямую (встроен в образ)
+- OWASP Dependency-Check запускается через `docker run owasp/dependency-check` (Docker-in-Docker через `/var/run/docker.sock`)
+- Clair сканирует образ через `clairctl`, подключаясь к `http://clair:8080`
+
+**Переменные окружения:**
+
+| Переменная        | По умолчанию                              | Описание                                     |
+| ----------------- | ----------------------------------------- | -------------------------------------------- |
+| `SOURCE`          | `local`                                   | Источник проекта: `local`, `github`, `gitlab` |
+| `PROJECT_DIR`     | `/app/project_inject`                     | Путь к проекту внутри контейнера             |
+| `SKIP_CLAIR`      | `false`                                   | Отключить сканирование Clair (`true`/`false`) |
+| `CLAIR_ENDPOINT`  | `http://clair:8080`                       | Адрес Clair API                              |
+| `IMAGE_NAME`      | —                                         | Docker-образ для сканирования Clair          |
+| `BDU`             | `false`                                   | Включить обогащение идентификаторами БДУ ФСТЭК |
+| `DEP_CHECK_DATA`  | `/app/.dependency-check-data`             | Кэш NVD для Dependency-Check                 |
+
+> **Примечание:** Если `IMAGE_NAME` не задан, шаг Clair пропускается автоматически.
 
 ***
 
