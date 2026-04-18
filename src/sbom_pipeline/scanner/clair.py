@@ -369,12 +369,12 @@ def _build_cvss_index(enrichments: dict) -> Dict[str, float]:
     for enricher_key, records in enrichments.items():
         # Format C: records is a plain dict keyed by vuln name
         if isinstance(records, dict):
-            for vuln_name, score_data in records.items():
+            for c_vuln_name, score_data in records.items():
                 if not isinstance(score_data, dict):
                     continue
                 score = _pick_score_from_flat(score_data)
-                if score and vuln_name not in index:
-                    index[vuln_name] = score
+                if score and c_vuln_name not in index:
+                    index[c_vuln_name] = score
             continue
 
         # Formats A & B: records is a list of {vuln, data} objects
