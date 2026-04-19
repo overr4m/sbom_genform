@@ -78,8 +78,8 @@ def run(cfg: PipelineConfig) -> None:
             clair_endpoint=cfg.clair_endpoint,
         )
         if _clair_report_file is not None:
-            with open(app_bom, encoding="utf-8") as _f:
-                _app_bom_data = json.load(_f)
+            with open(app_bom, encoding="utf-8") as _fh:
+                _app_bom_data = json.load(_fh)
             _app_bom_data = clair.enrich_sbom_with_clair_packages(
                 _app_bom_data,
                 _clair_report_file,

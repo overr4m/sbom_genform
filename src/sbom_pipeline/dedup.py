@@ -56,14 +56,16 @@ def _merge_component(target: Dict[str, Any], source: Dict[str, Any]) -> None:
     # --- hashes (union by alg) ---
     if source.get("hashes"):
         existing_algs: Dict[str, Any] = {
-            h.get("alg"): h
+            str(h["alg"]): h
             for h in (target.get("hashes") or [])
-            if isinstance(h, dict)
+            if isinstance(h, dict) and h.get("alg") is not None
         }
         for h in source["hashes"]:
-            if isinstance(h, dict) and h.get("alg") not in existing_algs:
-                target.setdefault("hashes", []).append(h)
-                existing_algs[h.get("alg")] = h
+            if isinstance(h, dict) and h.get("alg") is not None:
+                alg = str(h["alg"])
+                if alg not in existing_algs:
+                    target.setdefault("hashes", []).append(h)
+                    existing_algs[alg] = h
 
     # --- externalReferences (union by url) ---
     if source.get("externalReferences"):
