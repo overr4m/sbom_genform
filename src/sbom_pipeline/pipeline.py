@@ -2,14 +2,14 @@
 Оркестратор SBOM-пайплайна.
 
 Шаги:
-  1. Генерация SBOM             (generate.py)
-  2. Дедупликация компонентов   (dedup.py)
-  3. Подпись компонентов        (sign.py)  → app-bom-dedup-signed.json
-  4. Сканирование уязвимостей   (scanner/trivy, clair, depcheck)
-  5. Дедупликация уязвимостей   (dedup.py)
-  6. Слияние уязв. в SBOM       (vuln_merger.py)
-  7. Подпись с уязвимостями     (sign.py)  → merged-bom-signed.json
-  8. Экспорт отчётов            (exporter.py)
+  1. Генерация SBOM + обогащение пакетами из Clair  (generate.py, scanner/clair.py)
+  2. Дедупликация компонентов                       (dedup.py)  ← объединяет cdxgen + Clair
+  3. Подпись SBOM без уязвимостей                   (sign.py)  → app-bom-dedup-signed.json
+  4. Сканирование уязвимостей                       (scanner/trivy, depcheck, clair — повторное использование отчёта)
+  5. Дедупликация уязвимостей                       (dedup.py)
+  6. Слияние уязв. в SBOM                           (vuln_merger.py)
+  7. Подпись SBOM с уязвимостями                    (sign.py)  → merged-bom-signed.json
+  8. Экспорт отчётов                                (exporter.py)
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .config import PipelineConfig
 from .constants import (
@@ -66,6 +66,28 @@ def run(cfg: PipelineConfig) -> None:
         logging.info(f"[pipeline] Источник: local → {cfg.project_dir}")
         generate.generate_from_dir(cfg.project_dir, app_bom)
 
+    # Clair: получить пакеты образа и добавить их в SBOM.
+    # Уязвимости на этом этапе не разбираются — отчёт будет повторно
+    # использован на шаге 4.
+    _clair_report_file: Optional[Path] = None
+    if not cfg.skip_clair and cfg.image_name:
+        sanitized = cfg.image_name.replace(":", "_").replace("/", "_")
+        _clair_report_file = clair.run_scan_report(
+            image_name=cfg.image_name,
+            output_dir=cfg.clair_dir,
+            clair_endpoint=cfg.clair_endpoint,
+        )
+        if _clair_report_file is not None:
+            with open(app_bom, encoding="utf-8") as _f:
+                _app_bom_data = json.load(_f)
+            _app_bom_data = clair.enrich_sbom_with_clair_packages(
+                _app_bom_data,
+                _clair_report_file,
+                image_name=cfg.image_name,
+            )
+            SbomHandler.write_json(_app_bom_data, app_bom)
+            logging.info(f"[pipeline] SBOM обогащён пакетами из Clair → {app_bom}")
+
     # ------------------------------------------------------------------
     # 2. Дедупликация компонентов
     # ------------------------------------------------------------------
@@ -82,6 +104,15 @@ def run(cfg: PipelineConfig) -> None:
     # 4. Сканирование уязвимостей
     # ------------------------------------------------------------------
     all_findings: List[VulnFinding] = []
+
+    # Clair: разобрать уязвимости из уже сохранённого отчёта (clairctl не
+    # запускается повторно — используем файл, полученный на этапе 1).
+    if _clair_report_file is not None:
+        all_findings += clair.parse_report_findings(
+            report_file=_clair_report_file,
+            clair_endpoint=cfg.clair_endpoint,
+            nvd_api_key=cfg.nvd_api_key or "",
+        )
 
     # Trivy — filesystem
     all_findings += trivy.scan_filesystem(
@@ -103,14 +134,6 @@ def run(cfg: PipelineConfig) -> None:
         host_data_dir=cfg.host_dep_check_data,
         nvd_api_key=cfg.nvd_api_key,
     )
-    # Clair (опционально)
-    if not cfg.skip_clair and cfg.image_name:
-        all_findings += clair.scan_image(
-            image_name=cfg.image_name,
-            output_dir=cfg.clair_dir,
-            clair_endpoint=cfg.clair_endpoint,
-            nvd_api_key=cfg.nvd_api_key or "",
-        )
 
     logging.info(f"[pipeline] Всего уязвимостей из всех сканеров: {len(all_findings)}")
 
@@ -142,17 +165,6 @@ def run(cfg: PipelineConfig) -> None:
     # ------------------------------------------------------------------
     with open(dedup_bom, encoding="utf-8") as f:
         sbom_data: Dict[str, Any] = json.load(f)
-
-    # Обогатить компоненты SBOM данными из Clair-отчётов: container_image,
-    # container_role (слой введения пакета), os_distribution.
-    if not cfg.skip_clair and cfg.image_name:
-        sanitized = cfg.image_name.replace(":", "_").replace("/", "_")
-        clair_report = cfg.clair_dir / f"clair-{sanitized}.json"
-        sbom_data = clair.enrich_sbom_with_clair_packages(
-            sbom_data,
-            clair_report,
-            image_name=cfg.image_name,
-        )
 
     if all_findings:
         sbom_data = merge_vulns_into_sbom(

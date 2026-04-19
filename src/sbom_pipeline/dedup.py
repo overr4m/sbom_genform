@@ -11,26 +11,100 @@ if TYPE_CHECKING:
     from .vuln_merger import VulnFinding
 
 
+def _merge_component(target: Dict[str, Any], source: Dict[str, Any]) -> None:
+    """
+    Перенести все полезные данные из source в target (in-place).
+
+    Применяется при дедупликации: если один компонент попал в SBOM
+    из нескольких источников (cdxgen + Clair и т.п.), все полезные
+    свойства объединяются в одну запись.
+    """
+    # --- properties (union by name; предпочитаем непустое значение) ---
+    if source.get("properties"):
+        target_props: List[Dict[str, str]] = target.setdefault("properties", [])
+        by_name: Dict[str, Dict[str, str]] = {
+            p.get("name", ""): p for p in target_props if isinstance(p, dict)
+        }
+        for prop in source["properties"]:
+            if not isinstance(prop, dict):
+                continue
+            pname = prop.get("name", "")
+            pval = prop.get("value", "")
+            if pname not in by_name:
+                target_props.append(prop)
+                by_name[pname] = prop
+            elif not by_name[pname].get("value") and pval:
+                by_name[pname]["value"] = pval
+
+    # --- скалярные поля (заполняем только если у target пусто) ---
+    for field in ("cpe", "description", "purl", "version", "bom-ref"):
+        if not target.get(field) and source.get(field):
+            target[field] = source[field]
+
+    # --- licenses (union by JSON-ключ) ---
+    if source.get("licenses"):
+        existing_lic: set = {
+            json.dumps(lic, sort_keys=True)
+            for lic in (target.get("licenses") or [])
+        }
+        for lic in source["licenses"]:
+            k = json.dumps(lic, sort_keys=True)
+            if k not in existing_lic:
+                target.setdefault("licenses", []).append(lic)
+                existing_lic.add(k)
+
+    # --- hashes (union by alg) ---
+    if source.get("hashes"):
+        existing_algs: Dict[str, Any] = {
+            h.get("alg"): h
+            for h in (target.get("hashes") or [])
+            if isinstance(h, dict)
+        }
+        for h in source["hashes"]:
+            if isinstance(h, dict) and h.get("alg") not in existing_algs:
+                target.setdefault("hashes", []).append(h)
+                existing_algs[h.get("alg")] = h
+
+    # --- externalReferences (union by url) ---
+    if source.get("externalReferences"):
+        existing_urls: set = {
+            r.get("url")
+            for r in (target.get("externalReferences") or [])
+            if isinstance(r, dict)
+        }
+        for ref in source["externalReferences"]:
+            if isinstance(ref, dict) and ref.get("url") not in existing_urls:
+                target.setdefault("externalReferences", []).append(ref)
+                existing_urls.add(ref.get("url"))
+
+
 def dedup_sbom(input_path: Path, output_path: Path) -> Path:
     """
     Дедуплицировать компоненты CycloneDX SBOM по ключу PURL.
 
     Если PURL отсутствует, ключом служит «name@version».
+    При обнаружении дублей все полезные данные (properties, cpe, hashes,
+    licenses, externalReferences) объединяются в одну запись, чтобы не
+    потерять сведения из разных источников (cdxgen, Clair и т.д.).
     """
     with open(input_path, encoding="utf-8") as f:
         sbom: Dict[str, Any] = json.load(f)
 
     components = sbom.get("components", [])
-    seen: set[str] = set()
-    deduped: list[Dict[str, Any]] = []
+    seen: Dict[str, Dict[str, Any]] = {}
+    order: list[str] = []
 
     for comp in components:
         purl = comp.get("purl", "")
         key = purl if purl else f"{comp.get('name', '')}@{comp.get('version', '')}"
         if key not in seen:
-            seen.add(key)
-            deduped.append(comp)
+            seen[key] = comp
+            order.append(key)
+        else:
+            # Дубль — перенести все полезные данные из comp в уже сохранённый
+            _merge_component(seen[key], comp)
 
+    deduped = [seen[k] for k in order]
     removed = len(components) - len(deduped)
     logging.info(
         f"[dedup] {len(components)} → {len(deduped)} компонентов (удалено {removed} дублей)"

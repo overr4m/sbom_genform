@@ -38,27 +38,19 @@ _CLAIR_RETRIES = 20
 _CLAIR_RETRY_DELAY = 30.0
 
 
-def scan_image(
+def run_scan_report(
     image_name: str,
     output_dir: Path,
     clair_endpoint: str = "http://clair:8080",
-    host_output_dir: Optional[Path] = None,
     retries: int = _CLAIR_RETRIES,
     retry_delay: float = _CLAIR_RETRY_DELAY,
-    nvd_api_key: str = "",
-) -> List[VulnFinding]:
+) -> Optional[Path]:
     """
-    Проанализировать образ через clairctl + Clair HTTP API.
+    Запустить clairctl и сохранить JSON-отчёт в output_dir.
 
-    clairctl запускается локально (не через docker exec) и сам обращается
-    к реестру образов за манифестом и слоями.  Clair, в свою очередь,
-    самостоятельно скачивает слои по HTTPS-ссылкам, сформированным clairctl,
-    — никакого общего /tmp между процессами не требуется.
-
-    Шаг опциональный: при любой ошибке возвращает пустой список.
-
-    При ошибке 500 (updater'ы ещё не завершили первый цикл загрузки) повторяет
-    попытку каждые ``retry_delay`` секунд — до ``retries`` раз.
+    Возвращает путь к сохранённому файлу или None при ошибке.
+    Не разбирает уязвимости — только получает и сохраняет сырые данные
+    от Clair (пакеты + уязвимости) для дальнейшей обработки.
     """
     if not shutil.which("clairctl"):
         logging.warning(
@@ -66,11 +58,11 @@ def scan_image(
             "Скачайте его с https://github.com/quay/clair/releases "
             "и добавьте в PATH. Шаг пропущен."
         )
-        return []
+        return None
 
     if not _clair_server_alive(clair_endpoint):
         logging.warning("[clair] Сервер Clair недоступен по адресу %s. Шаг пропущен.", clair_endpoint)
-        return []
+        return None
 
     output_dir.mkdir(parents=True, exist_ok=True)
     sanitized = image_name.replace(":", "_").replace("/", "_")
@@ -108,28 +100,41 @@ def scan_image(
                 "[clair] Шаг Clair пропущен (попытка %d/%d, код %d). stderr: %s",
                 attempt, retries, result.returncode, (result.stderr or "")[:400]
             )
-            return []
+            return None
 
     if result is None or result.returncode != 0:
-        return []
+        return None
 
     if not result.stdout.strip():
         logging.warning("[clair] clairctl вернул пустой stdout")
-        return []
+        return None
 
     try:
         out_file.write_text(result.stdout, encoding="utf-8")
     except OSError as e:
         logging.error("[clair] Не удалось записать отчёт: %s", e)
-        return []
+        return None
 
     logging.info("[clair] Отчёт записан: %s (%d байт)", out_file, out_file.stat().st_size)
+    return out_file
 
-    findings = _parse(out_file)
+
+def parse_report_findings(
+    report_file: Path,
+    clair_endpoint: str = "http://clair:8080",
+    nvd_api_key: str = "",
+) -> List[VulnFinding]:
+    """
+    Извлечь уязвимости из сохранённого JSON-отчёта Clair.
+
+    Выполняет CVSS-обогащение через Clair matcher API и NVD fallback.
+    Не запускает clairctl — только читает уже готовый файл отчёта.
+    """
+    findings = _parse(report_file)
 
     # Обогащение CVSS через Clair matcher API
     try:
-        manifest_hash = _read_manifest_hash(out_file)
+        manifest_hash = _read_manifest_hash(report_file)
         if manifest_hash:
             enrichments = _fetch_enrichments_from_clair_api(clair_endpoint, manifest_hash)
             if enrichments:
@@ -150,6 +155,38 @@ def scan_image(
             logging.info("[clair] NVD fallback: заполнено %d CVSS из %d CVE", filled, len(nvd_scores))
 
     return findings
+
+
+def scan_image(
+    image_name: str,
+    output_dir: Path,
+    clair_endpoint: str = "http://clair:8080",
+    host_output_dir: Optional[Path] = None,
+    retries: int = _CLAIR_RETRIES,
+    retry_delay: float = _CLAIR_RETRY_DELAY,
+    nvd_api_key: str = "",
+) -> List[VulnFinding]:
+    """
+    Проанализировать образ через clairctl + Clair HTTP API.
+
+    Обёртка, совмещающая run_scan_report() и parse_report_findings().
+    Используется только там, где нужен единый вызов «запустить и получить
+    уязвимости» без разделения фаз.
+    """
+    report_file = run_scan_report(
+        image_name=image_name,
+        output_dir=output_dir,
+        clair_endpoint=clair_endpoint,
+        retries=retries,
+        retry_delay=retry_delay,
+    )
+    if report_file is None:
+        return []
+    return parse_report_findings(
+        report_file=report_file,
+        clair_endpoint=clair_endpoint,
+        nvd_api_key=nvd_api_key,
+    )
 
 
 # ------------------------------------------------------------------
@@ -665,44 +702,28 @@ def enrich_sbom_with_clair_packages(
         return sbom
 
     # ------------------------------------------------------------------
-    # Построить индекс существующих компонентов SBOM (name, version) → позиция
+    # Построить список существующих компонентов SBOM
     # ------------------------------------------------------------------
     import copy
     sbom = copy.deepcopy(sbom)
     components: List[Dict[str, Any]] = sbom.setdefault("components", [])
 
-    existing_index: Dict[tuple, int] = {}
-    for i, comp in enumerate(components):
-        cname = (comp.get("name") or "").lower()
-        cversion = (comp.get("version") or "").lower()
-        existing_index[(cname, cversion)] = i
-
     # ------------------------------------------------------------------
-    # Для каждого пакета Clair: обновить существующий компонент или добавить новый
+    # Для каждого пакета Clair: добавить как новый компонент.
+    # Существующие компоненты не изменяются — дедупликация объединит
+    # данные из обоих источников в одну запись.
     # ------------------------------------------------------------------
-    updated = 0
     added = 0
 
     for (pkg_name, pkg_version), info in clair_index.items():
-        if (pkg_name, pkg_version) in existing_index:
-            comp = components[existing_index[(pkg_name, pkg_version)]]
-            props: List[Dict[str, str]] = comp.setdefault("properties", [])
-            _set_prop(props, "container_image", effective_image)
-            if info["introduced_in"]:
-                _set_prop(props, "container_role", info["introduced_in"])
-            if info["distribution"]:
-                _set_prop(props, "os_distribution", info["distribution"])
-            updated += 1
-        else:
-            new_comp = _build_component_from_clair(
-                info["pkg"], info, effective_image, info["dist_did"]
-            )
-            components.append(new_comp)
-            added += 1
+        new_comp = _build_component_from_clair(
+            info["pkg"], info, effective_image, info["dist_did"]
+        )
+        components.append(new_comp)
+        added += 1
 
     logging.info(
-        f"[clair] enrich: обновлено {updated}, добавлено {added} компонентов "
-        f"из образа '{effective_image}'"
+        f"[clair] enrich: добавлено {added} компонентов из образа '{effective_image}'"
     )
     return sbom
 
