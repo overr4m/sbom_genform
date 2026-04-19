@@ -933,7 +933,8 @@ class TestEnrichSbomWithClairPackages:
         p.write_text(json.dumps(report))
         sbom = _make_sbom([_comp("libssl", "3.0.0")])
         result = fn(sbom, p, image_name="postgres:14")
-        props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
+        # Clair package is appended as a new component (index 1); original is unchanged
+        props = {pr["name"]: pr["value"] for pr in result["components"][1]["properties"]}
         assert props["container_image"] == "postgres:14"
 
     def test_matching_component_gets_container_role_from_env(self, tmp_path):
@@ -948,7 +949,8 @@ class TestEnrichSbomWithClairPackages:
         p.write_text(json.dumps(report))
         sbom = _make_sbom([_comp("libssl", "3.0.0")])
         result = fn(sbom, p, image_name="img")
-        props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
+        # Clair package is appended as a new component (index 1); original is unchanged
+        props = {pr["name"]: pr["value"] for pr in result["components"][1]["properties"]}
         assert props["container_role"] == "sha256:layer1"
 
     def test_matching_component_gets_os_distribution(self, tmp_path):
@@ -963,7 +965,8 @@ class TestEnrichSbomWithClairPackages:
         p.write_text(json.dumps(report))
         sbom = _make_sbom([_comp("libssl", "3.0.0")])
         result = fn(sbom, p, image_name="img")
-        props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
+        # Clair package is appended as a new component (index 1); original is unchanged
+        props = {pr["name"]: pr["value"] for pr in result["components"][1]["properties"]}
         assert props["os_distribution"] == "Alpine Linux 3.18"
 
     def test_os_distribution_falls_back_to_name_version(self, tmp_path):
@@ -978,7 +981,8 @@ class TestEnrichSbomWithClairPackages:
         p.write_text(json.dumps(report))
         sbom = _make_sbom([_comp("busybox", "1.36")])
         result = fn(sbom, p, image_name="img")
-        props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
+        # Clair package is appended as a new component (index 1); original is unchanged
+        props = {pr["name"]: pr["value"] for pr in result["components"][1]["properties"]}
         assert props["os_distribution"] == "Alpine 3.18"
 
     def test_no_clair_match_original_component_unchanged(self, tmp_path):
@@ -1102,13 +1106,14 @@ class TestEnrichSbomWithClairPackages:
         # SBOM only has curl (matches), not openssl (will be added)
         sbom = _make_sbom([_comp("curl", "7.88")])
         result = fn(sbom, p, image_name="img")
-        assert len(result["components"]) == 2
+        # original curl + clair curl + clair openssl = 3 components
+        assert len(result["components"]) == 3
         names = {c["name"] for c in result["components"]}
         assert "curl" in names
         assert "openssl" in names
-        # the original curl component should have been enriched
-        curl_comp = next(c for c in result["components"] if c["name"] == "curl")
-        props = {pr["name"]: pr["value"] for pr in curl_comp["properties"]}
+        # the Clair-added curl component has container_image
+        clair_curl = next(c for c in result["components"] if c["name"] == "curl" and c.get("properties"))
+        props = {pr["name"]: pr["value"] for pr in clair_curl["properties"]}
         assert props["container_image"] == "img"
 
     def test_image_name_falls_back_to_manifest_hash(self, tmp_path):
@@ -1124,7 +1129,8 @@ class TestEnrichSbomWithClairPackages:
         p.write_text(json.dumps(report))
         sbom = _make_sbom([_comp("curl", "7.88.0")])
         result = fn(sbom, p)  # no image_name
-        props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
+        # Clair package is appended as a new component (index 1); original is unchanged
+        props = {pr["name"]: pr["value"] for pr in result["components"][1]["properties"]}
         assert props["container_image"] == "sha256:deadbeef"
 
     def test_deep_copy_original_not_mutated(self, tmp_path):
@@ -1144,7 +1150,7 @@ class TestEnrichSbomWithClairPackages:
         assert original_sbom == snapshot
 
     def test_matching_is_case_insensitive(self, tmp_path):
-        """Clair names are lower-case; SBOM names may have mixed case."""
+        """Clair package is always added regardless of SBOM component name case."""
         import json
         fn = self._fn()
         report = _make_report(
@@ -1156,7 +1162,8 @@ class TestEnrichSbomWithClairPackages:
         p.write_text(json.dumps(report))
         sbom = _make_sbom([_comp("LibSSL1.1", "1.1.1n-0+deb11u3")])
         result = fn(sbom, p, image_name="img")
-        props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
+        # Clair package is appended as a new component (index 1); original is unchanged
+        props = {pr["name"]: pr["value"] for pr in result["components"][1]["properties"]}
         assert "container_image" in props
 
     def test_existing_properties_preserved(self, tmp_path):
@@ -1171,9 +1178,13 @@ class TestEnrichSbomWithClairPackages:
         p.write_text(json.dumps(report))
         sbom = _make_sbom([_comp("curl", "7.88", props=[{"name": "attack-surface", "value": "yes"}])])
         result = fn(sbom, p, image_name="img")
-        props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
-        assert props["attack-surface"] == "yes"
-        assert "container_image" in props
+        # original component keeps its properties intact (not modified)
+        orig_props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
+        assert orig_props["attack-surface"] == "yes"
+        assert "container_image" not in orig_props
+        # Clair added a new component with container_image
+        clair_props = {pr["name"]: pr["value"] for pr in result["components"][1]["properties"]}
+        assert "container_image" in clair_props
 
     def test_no_env_entry_skips_role_and_dist(self, tmp_path):
         """Package with no environment record: only container_image should be set."""
@@ -1188,7 +1199,8 @@ class TestEnrichSbomWithClairPackages:
         p.write_text(json.dumps(report))
         sbom = _make_sbom([_comp("curl", "7.88")])
         result = fn(sbom, p, image_name="img")
-        props = {pr["name"]: pr["value"] for pr in result["components"][0]["properties"]}
+        # Clair package is appended as a new component (index 1); original is unchanged
+        props = {pr["name"]: pr["value"] for pr in result["components"][1]["properties"]}
         assert props["container_image"] == "img"
         assert "container_role" not in props
         assert "os_distribution" not in props
