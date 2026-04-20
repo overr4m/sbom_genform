@@ -25,12 +25,13 @@ from rich.panel import Panel
 from rich.table import Table
 from rich import box as rich_box
 
+from .constants import SOURCE_TYPE_LOCAL
 from . import __version__
 from .banner import SECSBOMGEN, APPSECTA
 from .config import PipelineConfig
 from .pipeline import run as pipeline_run, format_sboms
 from .sign import verify_sbom
-from .utils import setup_logging
+from .utils import setup_logging, detect_git_service
 
 # ---------------------------------------------------------------------------
 # App
@@ -154,7 +155,6 @@ def _print_help_table() -> None:
 
     # ── run options ───────────────────────────────────────────────────────────
     rt = _opts_table()
-    _opt_row(rt, "--source",          "-s", "TEXT", "Источник: local | github | gitlab",         "SOURCE",         "local")
     _opt_row(rt, "--path",            "",   "PATH", "Путь к локальному проекту",                 "PROJECT_DIR",    "examples/project_inject")
     _opt_row(rt, "--url",             "",   "TEXT", "URL репозитория GitHub/GitLab",             "GIT_URL",        "")
     _opt_row(rt, "--token",           "",   "TEXT", "Токен доступа (ghp_... / glpat-...)",       "GIT_TOKEN",      "")
@@ -172,8 +172,8 @@ def _print_help_table() -> None:
     examples.add_row("[dim]Примеры:[/dim]")
     examples.add_row("[white]secsbom run[/white]  [dim]# локальный демо-проект[/dim]")
     examples.add_row("[white]secsbom run --path ./myproject[/white]")
-    examples.add_row("[white]secsbom run --source github --url https://github.com/org/repo --token ghp_...[/white]")
-    examples.add_row("[white]secsbom run --source gitlab --url https://gitlab.com/org/repo --token glpat-...[/white]")
+    examples.add_row("[white]secsbom run --url https://github.com/org/repo --token ghp_...[/white]")
+    examples.add_row("[white]secsbom run --url https://gitlab.com/org/repo --token glpat-...[/white]")
 
     run_group = Table(box=None, show_header=False, padding=(0, 0), show_edge=False)
     run_group.add_column()
@@ -209,11 +209,6 @@ def _print_help_table() -> None:
 
 @app.command("run", context_settings={"help_option_names": ["-h", "--help"]})
 def cmd_run(
-    source: str = typer.Option(
-        "local", "--source", "-s",
-        help="Источник: local | github | gitlab",
-        envvar="SOURCE",
-    ),
     path: Optional[Path] = typer.Option(
         None, "--path",
         help="Путь к локальному проекту (по умолчанию: examples/project_inject)",
@@ -270,11 +265,12 @@ def cmd_run(
     setup_logging(verbose)
 
     cfg = PipelineConfig.from_env()
-    cfg.source = source
     if path:
         cfg.project_dir = path
+        cfg.source = SOURCE_TYPE_LOCAL
     if url:
         cfg.git_url = url
+        cfg.source = detect_git_service(url)
     if token:
         cfg.git_token = token
     if branch:
@@ -637,34 +633,34 @@ def add_gost_cert_fields(sbom_path: Path, add_cert: bool = False) -> Path:
     """Добавить GOST поля в каждый компонент."""
     if not add_cert:
         return sbom_path
-    
+
     import json
     import logging
-    
+
     with open(sbom_path, 'r', encoding='utf-8') as f:
         sbom = json.load(f)
-    
+
     components = sbom.get("components", [])
     if not components:
         return sbom_path
-    
+
     gost_properties =[
         {"name": "GOST:attack_surface", "value": "no"},
         {"name": "GOST:security_function", "value": "no"}
     ]
-    
+
     updated = 0
     for component in components:
         props = component.get("properties", [])
         component["properties"] = props + gost_properties
         updated += 1
-    
+
     cert_path = Path(str(sbom_path).replace('.json', '(cert).json'))
     cert_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     with open(cert_path, 'w', encoding='utf-8') as f:
         json.dump(sbom, f, indent=2, ensure_ascii=False)
-    
+
     last_digit = updated % 10
     if updated > 20 and last_digit in (2, 3, 4):
         logging.info(f"GOST поля добавлены в {updated} компонента → {cert_path}")
@@ -680,17 +676,17 @@ def cmd_cert(
     """Добавление полей GOST:attack_surface, GOST:security_function во все компоненты (по умолчанию: value = "no")."""
     _print_banner()
     setup_logging()
-    
+
     if not sbom.exists():
         console.print(f"[bold red]✗ SBOM файл не найден:[/bold red] {sbom}")
         raise typer.Exit(code=1)
-    
+
     try:
         cert_sbom = add_gost_cert_fields(sbom, add_cert=True)
     except Exception as e:
         console.print(f"[bold red]✗ Ошибка добавления полей:[/bold red] {e}")
         raise typer.Exit(code=1)
-    
+
     output_path = output or cert_sbom  # Используем путь из utils если --output не указан
     console.print(f"[bold green]✓ Поля успешно добавлены в properties:[/bold green] {output_path}")
     _print_footer()

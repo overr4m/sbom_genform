@@ -55,6 +55,9 @@ class PipelineConfig:
     # --- GitHub API ---
     github_token: Optional[str] = None
 
+    # NVD API key for OWASP Dependency-Check
+    nvd_api_key: Optional[str] = None
+
     # --- Enrichment ---
     use_bdu: bool = False
 

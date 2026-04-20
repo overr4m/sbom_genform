@@ -3,6 +3,11 @@
 # Компоненты
 COMPONENT_TYPE_LIBRARY = "library"
 
+# Типы source
+SOURCE_TYPE_LOCAL = "local"
+SOURCE_TYPE_GITHUB = "github"
+SOURCE_TYPE_GITLAB = "gitlab"
+
 # Логирование
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 LOG_FILE = "sbom_pipeline.log"
@@ -35,3 +40,4 @@ DEPCHECK_DIR = "dependency-check"
 # CycloneDX
 CYCLONEDX_SPEC_VERSION = "1.5"
 CYCLONEDX_FORMAT = "CycloneDX"
+

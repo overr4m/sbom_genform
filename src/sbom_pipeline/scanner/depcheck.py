@@ -18,8 +18,8 @@ def scan(
     data_dir: Path,
     host_project_dir: Optional[Path] = None,
     host_output_dir: Optional[Path] = None,
-    host_data_dir: Optional[Path] = None,
     nvd_api_key: Optional[str] = None,
+    host_data_dir: Optional[Path] = None,
 ) -> List[VulnFinding]:
     """
     Запустить OWASP dependency-check через Docker.
@@ -46,6 +46,7 @@ def scan(
         "--format", "ALL",
         "--out", "/report",
         "--nvdValidForHours", "168",
+        "--nvdApiKey", nvd_api_key,
     ]
     if nvd_api_key:
         cmd += ["--nvdApiKey", nvd_api_key]
@@ -91,6 +92,7 @@ def _parse(result_file: Path) -> List[VulnFinding]:
         pkg_name = dep.get("fileName") or dep.get("name") or ""
         packages = dep.get("packages") or []
         purl = packages[0].get("id", "") if packages else ""
+        component_name, version = (pkg_name.rsplit(":", 1) + [""])[:2]
 
         for vuln in dep.get("vulnerabilities") or []:
             cvss_score = _extract_cvss(vuln)
@@ -106,8 +108,8 @@ def _parse(result_file: Path) -> List[VulnFinding]:
             findings.append(
                 VulnFinding(
                     cve_id=cve_id,
-                    component_name=pkg_name,
-                    component_version="",
+                    component_name=component_name,
+                    component_version=version,
                     component_purl=purl,
                     cvss_score=cvss_score,
                     severity=vuln.get("severity", "UNKNOWN").upper(),

@@ -337,6 +337,6 @@ sbom_genform/
 
 ***
 
-Copyright (c) 2025 Elijah S Shmakov
+Copyright (c) 2026 Elijah S Shmakov
 
 ![Logo](assets/logo.jpg)
