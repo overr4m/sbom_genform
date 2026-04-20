@@ -46,10 +46,11 @@ def scan(
         "--format", "ALL",
         "--out", "/report",
         "--nvdValidForHours", "168",
-        "--nvdApiKey", nvd_api_key,
     ]
+
     if nvd_api_key:
         cmd += ["--nvdApiKey", nvd_api_key]
+
     logging.info(f"[depcheck] Запуск dependency-check...")
     result = subprocess.run(cmd, capture_output=True, text=True)
 

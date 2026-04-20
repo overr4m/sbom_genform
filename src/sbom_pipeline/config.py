@@ -44,9 +44,6 @@ class PipelineConfig:
     host_clair_report_dir: Optional[Path] = None
     dep_check_data: Optional[Path] = None
 
-    # --- NVD API ---
-    nvd_api_key: Optional[str] = None
-
     # --- Сканирование образов ---
     image_name: Optional[str] = None
     clair_endpoint: str = "http://clair:8080"
