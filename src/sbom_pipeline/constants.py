@@ -3,6 +3,11 @@
 # Компоненты
 COMPONENT_TYPE_LIBRARY = "library"
 
+# Типы source
+SOURCE_TYPE_LOCAL = "local"
+SOURCE_TYPE_GITHUB = "github"
+SOURCE_TYPE_GITLAB = "gitlab"
+
 # Логирование
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 LOG_FILE = "sbom_pipeline.log"
@@ -24,7 +29,8 @@ REPORTS_DIR = "secgensbom_reports"
 # Имена файлов артефактов
 APP_BOM_FILE = "app-bom-cdxgen.json"
 DEDUP_BOM_FILE = "app-bom-dedup.json"
-SIGNED_BOM_FILE = "merged-bom-signed.json"
+SIGNED_DEDUP_BOM_FILE = "app-bom-dedup-signed.json"   # SBOM без уязвимостей
+SIGNED_BOM_FILE = "merged-bom-signed.json"            # SBOM с уязвимостями
 
 # Субдиректории сканеров
 TRIVY_DIR = "trivy"
@@ -34,3 +40,4 @@ DEPCHECK_DIR = "dependency-check"
 # CycloneDX
 CYCLONEDX_SPEC_VERSION = "1.5"
 CYCLONEDX_FORMAT = "CycloneDX"
+

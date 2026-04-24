@@ -21,6 +21,12 @@ class Dependency:
         depType: list,
         purl: str,
         pathToSbom: str,
+        package_type: str = "",
+        attack_surface: str = "",
+        security_function: str = "",
+        container_image: str = "",
+        container_role: str = "",
+        os_distribution: str = "",
     ) -> None:
         self.name = name
         self.version = version
@@ -29,8 +35,14 @@ class Dependency:
         self.depType = depType
         self.purl = purl
         self.pathToSbom = pathToSbom
+        self.package_type = package_type
+        self.attack_surface = attack_surface
+        self.security_function = security_function
+        self.container_image = container_image
+        self.container_role = container_role
+        self.os_distribution = os_distribution
 
-        logging.info(f"Обработка зависимости: {name} {version}")
+        logging.debug(f"Обработка зависимости: {name} {version}")
 
         if self not in _DepsMemory:
             try:

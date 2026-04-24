@@ -2,12 +2,14 @@
 Оркестратор SBOM-пайплайна.
 
 Шаги:
-  1. Генерация SBOM   (generate.py)
-  2. Дедупликация     (dedup.py)
-  3. Подпись SHA-256  (sign.py)
-  4. Сканирование     (scanner/trivy, clair, depcheck)
-  5. Слияние уязв.    (vuln_merger.py)
-  6. Экспорт отчётов  (exporter.py)
+  1. Генерация SBOM + обогащение пакетами из Clair  (generate.py, scanner/clair.py)
+  2. Дедупликация компонентов                       (dedup.py)  ← объединяет cdxgen + Clair
+  3. Подпись SBOM без уязвимостей                   (sign.py)  → app-bom-dedup-signed.json
+  4. Сканирование уязвимостей                       (scanner/trivy, depcheck, clair — повторное использование отчёта)
+  5. Дедупликация уязвимостей                       (dedup.py)
+  6. Слияние уязв. в SBOM                           (vuln_merger.py)
+  7. Подпись SBOM с уязвимостями                    (sign.py)  → merged-bom-signed.json
+  8. Экспорт отчётов                                (exporter.py)
 """
 
 from __future__ import annotations
@@ -15,12 +17,13 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .config import PipelineConfig
 from .constants import (
     APP_BOM_FILE,
     DEDUP_BOM_FILE,
+    SIGNED_DEDUP_BOM_FILE,
     SIGNED_BOM_FILE,
     EXCEL_DIR,
     ODT_DIR,
@@ -63,31 +66,62 @@ def run(cfg: PipelineConfig) -> None:
         logging.info(f"[pipeline] Источник: local → {cfg.project_dir}")
         generate.generate_from_dir(cfg.project_dir, app_bom)
 
+    # Clair: получить пакеты образа и добавить их в SBOM.
+    # Уязвимости на этом этапе не разбираются — отчёт будет повторно
+    # использован на шаге 4.
+    _clair_report_file: Optional[Path] = None
+    if not cfg.skip_clair and cfg.image_name:
+        sanitized = cfg.image_name.replace(":", "_").replace("/", "_")
+        _clair_report_file = clair.run_scan_report(
+            image_name=cfg.image_name,
+            output_dir=cfg.clair_dir,
+            clair_endpoint=cfg.clair_endpoint,
+        )
+        if _clair_report_file is not None:
+            with open(app_bom, encoding="utf-8") as _fh:
+                _app_bom_data = json.load(_fh)
+            _app_bom_data = clair.enrich_sbom_with_clair_packages(
+                _app_bom_data,
+                _clair_report_file,
+                image_name=cfg.image_name,
+            )
+            SbomHandler.write_json(_app_bom_data, app_bom)
+            logging.info(f"[pipeline] SBOM обогащён пакетами из Clair → {app_bom}")
+
     # ------------------------------------------------------------------
-    # 2. Дедупликация
+    # 2. Дедупликация компонентов
     # ------------------------------------------------------------------
     dedup_bom = cfg.output_dir / DEDUP_BOM_FILE
     dedup.dedup_sbom(app_bom, dedup_bom)
 
     # ------------------------------------------------------------------
-    # 3. Подпись SHA-256
+    # 3. Подпись SBOM без уязвимостей (SHA-256)
     # ------------------------------------------------------------------
-    signed_bom = cfg.output_dir / SIGNED_BOM_FILE
-    sign.sign_sbom(dedup_bom, signed_bom)
+    signed_dedup_bom = cfg.output_dir / SIGNED_DEDUP_BOM_FILE
+    sign.sign_sbom(dedup_bom, signed_dedup_bom)
 
     # ------------------------------------------------------------------
     # 4. Сканирование уязвимостей
     # ------------------------------------------------------------------
     all_findings: List[VulnFinding] = []
 
+    # Clair: разобрать уязвимости из уже сохранённого отчёта (clairctl не
+    # запускается повторно — используем файл, полученный на этапе 1).
+    if _clair_report_file is not None:
+        all_findings += clair.parse_report_findings(
+            report_file=_clair_report_file,
+            clair_endpoint=cfg.clair_endpoint,
+            nvd_api_key=cfg.nvd_api_key or "",
+        )
+
     # Trivy — filesystem
     all_findings += trivy.scan_filesystem(
         project_dir=cfg.project_dir,
         output_dir=cfg.trivy_dir,
     )
-    # Trivy — по SBOM
+    # Trivy — по SBOM (используем подписанный SBOM без уязвимостей)
     all_findings += trivy.scan_sbom(
-        sbom_path=signed_bom,
+        sbom_path=signed_dedup_bom,
         output_dir=cfg.trivy_dir,
     )
     # Dependency-Check
@@ -97,21 +131,39 @@ def run(cfg: PipelineConfig) -> None:
         data_dir=cfg.dep_check_data or Path(".dependency-check-data"),
         host_project_dir=cfg.host_project_dir,
         host_output_dir=cfg.host_dep_report_dir,
+        host_data_dir=cfg.host_dep_check_data,
+        nvd_api_key=cfg.nvd_api_key,
     )
-    # Clair (опционально)
-    if not cfg.skip_clair and cfg.image_name:
-        all_findings += clair.scan_image(
-            image_name=cfg.image_name,
-            output_dir=cfg.clair_dir,
-            clair_endpoint=cfg.clair_endpoint,
-        )
 
     logging.info(f"[pipeline] Всего уязвимостей из всех сканеров: {len(all_findings)}")
 
+    # Cross-populate CVSS scores: build a CVE→best_score index from every
+    # finding that already has a non-zero score, then apply it to any
+    # finding that still has score == 0.0.  This fills in Clair findings
+    # whose NVD enricher is not configured, using data from Trivy/depcheck.
+    _cve_score: Dict[str, float] = {}
+    for _f in all_findings:
+        if _f.cvss_score and _f.cve_id not in _cve_score:
+            _cve_score[_f.cve_id] = _f.cvss_score
+        elif _f.cvss_score and _f.cvss_score > _cve_score.get(_f.cve_id, 0.0):
+            _cve_score[_f.cve_id] = _f.cvss_score
+    _filled = 0
+    for _f in all_findings:
+        if _f.cvss_score == 0.0 and _f.cve_id in _cve_score:
+            _f.cvss_score = _cve_score[_f.cve_id]
+            _filled += 1
+    if _filled:
+        logging.info(f"[pipeline] CVSS cross-populated для {_filled} уязвимостей")
+
     # ------------------------------------------------------------------
-    # 5. Слияние уязвимостей в SBOM
+    # 5. Дедупликация уязвимостей
     # ------------------------------------------------------------------
-    with open(signed_bom, encoding="utf-8") as f:
+    all_findings = dedup.dedup_vulns(all_findings)
+
+    # ------------------------------------------------------------------
+    # 6. Слияние уязвимостей в SBOM
+    # ------------------------------------------------------------------
+    with open(dedup_bom, encoding="utf-8") as f:
         sbom_data: Dict[str, Any] = json.load(f)
 
     if all_findings:
@@ -120,14 +172,25 @@ def run(cfg: PipelineConfig) -> None:
             all_findings,
             enable_bdu=cfg.use_bdu,
         )
-        SbomHandler.write_json(sbom_data, signed_bom)
 
         # Сохранить нормализованный vuln-dump
         save_vuln_report(all_findings, cfg.output_dir / "vulns-normalized.json")
 
     # ------------------------------------------------------------------
-    # 6. Экспорт отчётов
+    # 7. Подпись SBOM с уязвимостями
     # ------------------------------------------------------------------
+    signed_bom = cfg.output_dir / SIGNED_BOM_FILE
+    SbomHandler.write_json(sbom_data, signed_bom)
+    sign.sign_sbom(signed_bom, signed_bom)
+
+    logging.info(f"[pipeline] SBOM без уязвимостей: {signed_dedup_bom}")
+    logging.info(f"[pipeline] SBOM с уязвимостями:  {signed_bom}")
+
+    # ------------------------------------------------------------------
+    # 8. Экспорт отчётов
+    # ------------------------------------------------------------------
+    logging.info("[pipeline] Экспорт отчётов...")
+
     _export_reports(sbom_data, all_findings, cfg)
 
     logging.info("[pipeline] Пайплайн завершён.")
@@ -192,22 +255,80 @@ def _export_reports(
 def _extract_dependencies(sbom: Dict[str, Any], sbom_path: str) -> List[Dependency]:
     """Извлечь зависимости типа 'library' из SBOM."""
     deps: List[Dependency] = []
+
+    # Container image from SBOM metadata (used as fallback when component has no own property)
+    metadata_comp = sbom.get("metadata", {}).get("component", {})
+    metadata_image = (
+        metadata_comp.get("name", "")
+        if metadata_comp.get("type") == "container"
+        else ""
+    )
+
     for comp in sbom.get("components", []):
         if comp.get("type") != COMPONENT_TYPE_LIBRARY:
             continue
         try:
+            props = {
+                p.get("name", ""): p.get("value", "")
+                for p in (comp.get("properties") or [])
+                if isinstance(p, dict)
+            }
+            # depType: collect only string-valued property names/values
+            # (the full properties list contains dicts, not type strings)
+            raw_props = comp.get("properties") or []
+            dep_type_strings: List[str] = [
+                p.get("value", "")
+                for p in raw_props
+                if isinstance(p, dict) and isinstance(p.get("value"), str)
+            ]
+            # Per-component container_image property (set by Clair enrichment) takes
+            # priority; fall back to the image name from SBOM metadata.
+            container_image = _find_prop(
+                props,
+                ("container_image", "container-image", "containerImage"),
+            ) or metadata_image
             dep = Dependency(
                 name=comp.get("name", ""),
                 version=comp.get("version", ""),
-                depType=(
-                    comp.get("properties", [])
-                    if isinstance(comp.get("properties"), list)
-                    else []
-                ),
+                depType=dep_type_strings,
                 purl=comp.get("purl") or "",
                 pathToSbom=sbom_path,
+                package_type=_purl_type(comp.get("purl") or ""),
+                attack_surface=_find_prop(
+                    props,
+                    ("attack-surface", "attack_surface", "attackSurface", "isAttackSurface"),
+                ),
+                security_function=_find_prop(
+                    props,
+                    ("security-function", "security_function", "securityFunction", "isSecurityFunction"),
+                ),
+                container_image=container_image,
+                container_role=_find_prop(
+                    props,
+                    ("container-role", "container_role", "containerRole", "cdx:docker:layer", "layer"),
+                ),
+                os_distribution=_find_prop(
+                    props,
+                    ("os_distribution", "os-distribution", "osDistribution"),
+                ),
             )
             deps.append(dep)
         except Exception as e:
             logging.warning(f"[pipeline] Пропущен компонент: {e}")
     return deps
+
+
+def _purl_type(purl: str) -> str:
+    """Extract ecosystem type from a PURL string (pkg:<type>/...)."""
+    if purl.startswith("pkg:"):
+        segment = purl[4:].split("/")[0].split("@")[0].split("?")[0]
+        return segment
+    return ""
+
+
+def _find_prop(props: Dict[str, str], keys: tuple) -> str:
+    """Return value of the first matching key from a properties dict."""
+    for key in keys:
+        if key in props:
+            return props[key]
+    return ""

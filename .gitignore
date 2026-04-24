@@ -33,7 +33,9 @@ build/
 
 # Secrets and environment configs
 .env
+.envrc
 .env.local
+config.env
 venv/
 .venv/
 
@@ -52,6 +54,7 @@ secgensbom_out/
 secgensbom_reports/
 reports/
 .dependency-check-data/
+
 
 # Generated report files (keep examples/ intact)
 *.sig

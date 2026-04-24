@@ -12,6 +12,16 @@ from typing import List
 from ..vuln_merger import VulnFinding
 
 
+_STATUS_RU: dict[str, str] = {
+    "affected":             "Подвержен уязвимости",
+    "fixed":                "Исправлено",
+    "will_not_fix":         "Исправление не планируется",
+    "fix_deferred":         "Исправление отложено",
+    "end_of_life":          "Продукт снят с поддержки",
+    "under_investigation":  "Под расследованием",
+}
+
+
 def scan_filesystem(project_dir: Path, output_dir: Path) -> List[VulnFinding]:
     """trivy fs — сканирование директории проекта."""
     if not shutil.which("trivy"):
@@ -23,7 +33,9 @@ def scan_filesystem(project_dir: Path, output_dir: Path) -> List[VulnFinding]:
 
     cmd = [
         "trivy", "fs",
-        "--scanners", "vuln,secret,config",
+        "--db-repository", "ghcr.io/aquasecurity/trivy-db",
+        "--java-db-repository", "ghcr.io/aquasecurity/trivy-java-db",
+        "--scanners", "vuln,secret,misconfig",
         "--exit-code", "0",
         "--format", "json",
         "--output", str(out_file),
@@ -49,6 +61,7 @@ def scan_sbom(sbom_path: Path, output_dir: Path) -> List[VulnFinding]:
 
     cmd = [
         "trivy", "sbom",
+        "--db-repository", "ghcr.io/aquasecurity/trivy-db",
         "--quiet",
         "--format", "json",
         "--output", str(out_file),
@@ -82,6 +95,11 @@ def _parse(result_file: Path, scanner: str) -> List[VulnFinding]:
     for result_block in data.get("Results", []):
         for vuln in result_block.get("Vulnerabilities") or []:
             cvss_score = _extract_cvss(vuln.get("CVSS", {}))
+            fixed = vuln.get("FixedVersion", "")
+            recommendation = (
+                vuln.get("PrimaryURL", "")
+                or (f"Обновить до версии {fixed}" if fixed else "")
+            )
             findings.append(
                 VulnFinding(
                     cve_id=vuln.get("VulnerabilityID", ""),
@@ -92,7 +110,9 @@ def _parse(result_file: Path, scanner: str) -> List[VulnFinding]:
                     severity=vuln.get("Severity", "UNKNOWN"),
                     description=vuln.get("Title") or vuln.get("Description", ""),
                     scanner=scanner,
-                    fixed_version=vuln.get("FixedVersion", ""),
+                    fixed_version=fixed,
+                    recommendation=recommendation,
+                    acceptability_status=_STATUS_RU.get(vuln.get("Status", ""), vuln.get("Status", "")),
                 )
             )
 
