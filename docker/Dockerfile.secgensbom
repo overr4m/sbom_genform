@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 ARG VERSION=latest
 
@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # --- Trivy ---
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-    | sh -s -- -b /usr/local/bin
+    | sh -s -- -b /usr/local/bin v0.70.0
 
 # --- clairctl ---
 # Kept as a fallback; the primary execution path is `docker exec <clair-container> clairctl`
@@ -39,19 +39,24 @@ RUN ARCH=$(dpkg --print-architecture) \
 # --- Node.js LTS + npx (cdxgen для non-Python проектов) ---
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
  && apt-get install -y --no-install-recommends nodejs
 
 # --- Python-пакет sbom-pipeline ---
 WORKDIR /app
 COPY pyproject.toml LICENSE.md README.md ./
 COPY src/ ./src/
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip \
- && pip install .
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir . \
+ && chmod +x /usr/local/bin/secsbom /usr/local/bin/secsbom-pipeline
 
 # --- Демо-проект (монтируй свой через -v /path:/app/project_inject) ---
 COPY examples/project_inject ./examples/project_inject
+
+# --- Создание непривилегированного пользователя ---
+RUN groupadd --gid 1001 sbom \
+ && useradd --uid 1001 --gid sbom --create-home --shell /usr/sbin/nologin sbom \
+ && chown -R sbom:sbom /app
 
 # --- Переменные по умолчанию ---
 ENV PYTHONUNBUFFERED=1 \
@@ -61,6 +66,9 @@ ENV PYTHONUNBUFFERED=1 \
     SOURCE=local
 
 VOLUME ["/app/project_inject", "/app/secgensbom_out", "/app/secgensbom_reports"]
+
+# --- Запуск от имени непривилегированного пользователя ---
+USER sbom
 
 ENTRYPOINT ["secsbom-pipeline"]
 CMD ["run", "-v"]

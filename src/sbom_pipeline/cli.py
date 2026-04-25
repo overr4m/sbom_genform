@@ -13,6 +13,7 @@ CLI точка входа: secsbom / secsbom-pipeline
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -696,6 +697,13 @@ def cmd_cert(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    if os.getuid() == 0:
+        Console(stderr=True).print(
+            "[bold red]✗ Запуск от имени root запрещён. "
+            "Используйте непривилегированного пользователя.[/bold red]"
+        )
+        sys.exit(1)
+
     # Перехватываем secsbom / secsbom --help / secsbom -h до Click
     if len(sys.argv) == 1 or (len(sys.argv) == 2 and sys.argv[1] in ("--help", "-h")):
         _print_banner()

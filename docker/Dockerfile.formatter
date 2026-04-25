@@ -6,7 +6,8 @@ COPY pyproject.toml ./
 COPY src/ ./src/
 
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -e .
+ && pip install --no-cache-dir -e . \
+ && chmod +x /usr/local/bin/secsbom /usr/local/bin/secsbom-pipeline
 
 ENV PYTHONUNBUFFERED=1 \
     OUTPUT_DIR=/app/secgensbom_out \
