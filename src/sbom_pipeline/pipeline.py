@@ -70,6 +70,12 @@ def run(cfg: PipelineConfig) -> None:
     # Уязвимости на этом этапе не разбираются — отчёт будет повторно
     # использован на шаге 4.
     _clair_report_file: Optional[Path] = None
+    if not cfg.skip_clair and not cfg.image_name:
+        logging.warning(
+                "[clair] SKIP_CLAIR=false, но IMAGE_NAME не задан — "
+                "сканирование Clair пропущено. "
+                "Укажите переменную окружения IMAGE_NAME=<image>:<tag>."
+            )
     if not cfg.skip_clair and cfg.image_name:
         sanitized = cfg.image_name.replace(":", "_").replace("/", "_")
         _clair_report_file = clair.run_scan_report(
